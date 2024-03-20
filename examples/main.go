@@ -3,16 +3,20 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/shopspring/decimal"
 	"github.com/xslasd/mathxf"
+	"math"
 	"reflect"
 )
 
 func main() {
 	input := `
-set aa = 300
+set aa =100
 set bb = 0
-if 200<aa and bb>=0 {
-	res["cc"]=ff+3
+if 200<max(aa,bb+400) {
+	res.cc=pi-3
+    res.dd=(-150/100)*0.17
+    res.ff=bb/3
 } else {
 	res["cc"]=2+3
 }`
@@ -24,12 +28,21 @@ if 200<aa and bb>=0 {
 	if err != nil {
 		panic(err)
 	}
+
 	ctx := mathxf.NewEvaluatorContext(context.Background())
-	ctx.Private["ff"] = reflect.ValueOf(200)
-	for _, v := range doc.Nodes {
-		fmt.Println(v.Execute(ctx))
+	ctx.Private["ff"] = reflect.ValueOf(0.03)
+	ctx.ResValues["res"] = make(mathxf.VarMap)
+	err = doc.Execute(ctx)
+	fmt.Println(err, "------------err")
+
+	for k, v := range ctx.ResValues["res"] {
+		val, _ := v.Interface().(decimal.Decimal)
+		f, _ := val.Float64()
+		fmt.Printf("%s--ResValues---%.16f\n", k, f)
 	}
-	for k, v := range ctx.ResValues {
-		fmt.Println("--ResValues---", k, v)
-	}
+}
+
+func Round(f float64, n int) float64 {
+	p := math.Pow10(n)
+	return math.Round(f*p) / p
 }

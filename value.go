@@ -7,10 +7,14 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/shopspring/decimal"
 )
 
 var (
-	typeOfValuePtr = reflect.TypeOf(new(Value))
+	TypeOfValuePtr         = reflect.TypeOf(new(Value))
+	TypeOfEvaluatorContext = reflect.TypeOf(new(EvaluatorContext)).Elem()
+	TypeOfDecimalPtr       = reflect.TypeOf(new(decimal.Decimal))
 )
 
 type Value struct {
@@ -48,22 +52,57 @@ func (v *Value) IsBool() bool {
 
 // IsFloat checks whether the underlying value is a float
 func (v *Value) IsFloat() bool {
-	return v.getResolvedValue().Kind() == reflect.Float32 ||
-		v.getResolvedValue().Kind() == reflect.Float64
+	val := v.getResolvedValue()
+	return val.Kind() == reflect.Float32 ||
+		val.Kind() == reflect.Float64
+}
+func (v *Value) IsDecimal() bool {
+	val := v.getResolvedValue()
+	return val.Type() == TypeOfDecimalPtr.Elem() || v.IsNumber()
+}
+func (v *Value) Decimal() decimal.Decimal {
+	val := v.getResolvedValue()
+	switch val.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return decimal.NewFromInt(val.Int())
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return decimal.NewFromInt(int64(val.Uint()))
+	case reflect.Float32, reflect.Float64:
+		return decimal.NewFromFloat(val.Float())
+	case reflect.String:
+		// Try to convert from string to float64 (base 10)
+		f, err := strconv.ParseFloat(v.getResolvedValue().String(), 64)
+		if err != nil {
+			return decimal.Decimal{}
+		}
+		return decimal.NewFromFloat(f)
+	default:
+		if val.Type() == TypeOfDecimalPtr.Elem() {
+			b, ok := val.Interface().(decimal.Decimal)
+			fmt.Println("---------------Decimal----------------", b)
+			if ok {
+				return b
+			}
+		}
+		//logf("Value.Float() not available for type: %name\n", v.getResolvedValue().Kind().String())
+		return decimal.Decimal{}
+	}
 }
 
 // IsInteger checks whether the underlying value is an integer
 func (v *Value) IsInteger() bool {
-	return v.getResolvedValue().Kind() == reflect.Int ||
-		v.getResolvedValue().Kind() == reflect.Int8 ||
-		v.getResolvedValue().Kind() == reflect.Int16 ||
-		v.getResolvedValue().Kind() == reflect.Int32 ||
-		v.getResolvedValue().Kind() == reflect.Int64 ||
-		v.getResolvedValue().Kind() == reflect.Uint ||
-		v.getResolvedValue().Kind() == reflect.Uint8 ||
-		v.getResolvedValue().Kind() == reflect.Uint16 ||
-		v.getResolvedValue().Kind() == reflect.Uint32 ||
-		v.getResolvedValue().Kind() == reflect.Uint64
+	val := v.getResolvedValue()
+	return val.Kind() == reflect.Int ||
+		val.Kind() == reflect.Int8 ||
+		val.Kind() == reflect.Int16 ||
+		val.Kind() == reflect.Int32 ||
+		val.Kind() == reflect.Int64 ||
+		val.Kind() == reflect.Uint ||
+		val.Kind() == reflect.Uint8 ||
+		val.Kind() == reflect.Uint16 ||
+		val.Kind() == reflect.Uint32 ||
+		val.Kind() == reflect.Uint64 ||
+		val.Type() == TypeOfDecimalPtr.Elem()
 }
 
 // IsNumber checks whether the underlying value is either an integer
@@ -130,21 +169,30 @@ func (v *Value) String() string {
 // value, if necessary). If it'name not possible to convert the underlying value,
 // it will return 0.
 func (v *Value) Integer() int {
-	switch v.getResolvedValue().Kind() {
+	val := v.getResolvedValue()
+	switch val.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return int(v.getResolvedValue().Int())
+		return int(val.Int())
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return int(v.getResolvedValue().Uint())
+		return int(val.Uint())
 	case reflect.Float32, reflect.Float64:
-		return int(v.getResolvedValue().Float())
+		return int(val.Float())
 	case reflect.String:
 		// Try to convert from string to int (base 10)
-		f, err := strconv.ParseFloat(v.getResolvedValue().String(), 64)
+		f, err := strconv.ParseFloat(val.String(), 64)
 		if err != nil {
 			return 0
 		}
 		return int(f)
 	default:
+		if val.Type() == TypeOfDecimalPtr.Elem() {
+			b, ok := val.Interface().(decimal.Decimal)
+			if ok {
+				f, _ := b.Float64()
+				return int(f)
+			}
+			return 0
+		}
 		//logf("Value.Integer() not available for type: %name\n", v.getResolvedValue().Kind().String())
 		return 0
 	}
@@ -154,21 +202,31 @@ func (v *Value) Integer() int {
 // value, if necessary). If it'name not possible to convert the underlying value,
 // it will return 0.0.
 func (v *Value) Float() float64 {
-	switch v.getResolvedValue().Kind() {
+	val := v.getResolvedValue()
+	switch val.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return float64(v.getResolvedValue().Int())
+		return float64(val.Int())
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return float64(v.getResolvedValue().Uint())
+		return float64(val.Uint())
 	case reflect.Float32, reflect.Float64:
-		return v.getResolvedValue().Float()
+		return val.Float()
 	case reflect.String:
 		// Try to convert from string to float64 (base 10)
-		f, err := strconv.ParseFloat(v.getResolvedValue().String(), 64)
+		f, err := strconv.ParseFloat(val.String(), 64)
 		if err != nil {
 			return 0.0
 		}
 		return f
 	default:
+		fmt.Println("0--------------", val.Type(), val.Type() == TypeOfDecimalPtr.Elem())
+		if val.Type() == TypeOfDecimalPtr.Elem() {
+			b, ok := val.Interface().(decimal.Decimal)
+			if ok {
+				f, _ := b.Float64()
+				return f
+			}
+			return 0
+		}
 		//logf("Value.Float() not available for type: %name\n", v.getResolvedValue().Kind().String())
 		return 0.0
 	}
@@ -210,54 +268,30 @@ func (v *Value) Time() time.Time {
 //
 // Otherwise returns always FALSE.
 func (v *Value) IsTrue() bool {
-	switch v.getResolvedValue().Kind() {
+	val := v.getResolvedValue()
+	switch val.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return v.getResolvedValue().Int() != 0
+		return val.Int() != 0
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return v.getResolvedValue().Uint() != 0
+		return val.Uint() != 0
 	case reflect.Float32, reflect.Float64:
-		return v.getResolvedValue().Float() != 0
+		return val.Float() != 0
 	case reflect.Array, reflect.Chan, reflect.Map, reflect.Slice, reflect.String:
-		return v.getResolvedValue().Len() > 0
+		return val.Len() > 0
 	case reflect.Bool:
-		return v.getResolvedValue().Bool()
+		return val.Bool()
 	case reflect.Struct:
 		return true // struct instance is always true
 	default:
+		if val.Type() == TypeOfDecimalPtr.Elem() {
+			b, ok := val.Interface().(decimal.Decimal)
+			if ok {
+				return b.Cmp(decimal.Zero) > 0
+			}
+			return false
+		}
 		//logf("Value.IsTrue() not available for type: %name\n", v.getResolvedValue().Kind().String())
 		return false
-	}
-}
-
-// Negate tries to negate the underlying value. It'name mainly used for
-// the NOT-operator and in conjunction with a call to
-// return_value.IsTrue() afterwards.
-//
-// Example:
-//
-//	AsValue(1).Negate().IsTrue() == false
-func (v *Value) Negate() *Value {
-	switch v.getResolvedValue().Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		if v.Integer() != 0 {
-			return AsValue(0)
-		}
-		return AsValue(1)
-	case reflect.Float32, reflect.Float64:
-		if v.Float() != 0.0 {
-			return AsValue(float64(0.0))
-		}
-		return AsValue(float64(1.1))
-	case reflect.Array, reflect.Chan, reflect.Map, reflect.Slice, reflect.String:
-		return AsValue(v.getResolvedValue().Len() == 0)
-	case reflect.Bool:
-		return AsValue(!v.getResolvedValue().Bool())
-	case reflect.Struct:
-		return AsValue(false)
-	default:
-		//logf("Value.IsTrue() not available for type: %name\n", v.getResolvedValue().Kind().String())
-		return AsValue(true)
 	}
 }
 
@@ -346,15 +380,14 @@ func (v *Value) Contains(other *Value) bool {
 			fmt.Printf("Value.Contains() does not support lookup type '%name'\n", other.getResolvedValue().Kind().String())
 			return false
 		}
-
 		return mapValue.IsValid()
 	case reflect.String:
-		return strings.Contains(v.getResolvedValue().String(), other.String())
+		return strings.Contains(baseValue.String(), other.String())
 
 	case reflect.Slice, reflect.Array:
 		for i := 0; i < baseValue.Len(); i++ {
 			item := baseValue.Index(i)
-			if item.Type() == typeOfValuePtr {
+			if item.Type() == TypeOfValuePtr {
 				tmpValue := item.Interface().(*Value)
 				item = tmpValue.val
 			}

@@ -87,17 +87,6 @@ type Parser struct {
 	peekCount  int
 }
 
-// errorf formats the error and terminates processing.
-func (p *Parser) errorf(format string, args ...interface{}) {
-	format = fmt.Sprintf("template %d: %s", p.lex.line, format)
-	panic(fmt.Errorf(format, args...))
-}
-
-// error terminates processing.
-func (p *Parser) error(err error) {
-	p.errorf("%name", err)
-}
-
 func (p *Parser) peekToken() Token {
 	if p.peekCount > 0 {
 		return p.peekTokens[p.peekCount-1]

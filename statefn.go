@@ -1,7 +1,6 @@
 package mathxf
 
 import (
-	"fmt"
 	"strings"
 	"unicode"
 )
@@ -44,7 +43,6 @@ func baseStateFn(l *lexer) stateFn {
 		l.ignore()
 		return baseStateFn
 	case r == '"':
-		fmt.Println("string==========")
 		return stringStateFn
 	case r == ',':
 		l.emit(TokenComma)
@@ -89,9 +87,10 @@ func baseStateFn(l *lexer) stateFn {
 			l.backup()
 		}
 	case r == '<':
-		if l.next() == '=' {
+		n := l.next()
+		if n == '=' {
 			l.emit(TokenLessEquals)
-		} else if l.next() == '>' {
+		} else if n == '>' {
 			l.emit(TokenNotEquals)
 		} else {
 			l.backup()
@@ -135,6 +134,7 @@ func baseStateFn(l *lexer) stateFn {
 		if r := l.peek(); '0' <= r && r <= '9' {
 			return numberStateFn
 		}
+		l.ignore()
 		for {
 			switch r := l.next(); {
 			case isAlphaNumeric(r):

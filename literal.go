@@ -2,6 +2,7 @@ package mathxf
 
 import (
 	"fmt"
+	"github.com/shopspring/decimal"
 	"reflect"
 	"strings"
 )
@@ -16,7 +17,7 @@ func (a assignmentResolver) Execute(ctx EvaluatorContext) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(val)
+	fmt.Println("--------assignmentResolver---------Execute---------", val)
 	return nil
 }
 
@@ -32,12 +33,12 @@ func (a assignmentResolver) Evaluate(ctx EvaluatorContext) (*Value, error) {
 	return AsValue(nil), nil
 }
 
-type floatResolver struct {
+type numberResolver struct {
 	locationToken *Token
 	val           float64
 }
 
-func (f floatResolver) Execute(ctx EvaluatorContext) error {
+func (f numberResolver) Execute(ctx EvaluatorContext) error {
 	val, err := f.Evaluate(ctx)
 	if err != nil {
 		return err
@@ -46,11 +47,14 @@ func (f floatResolver) Execute(ctx EvaluatorContext) error {
 	return nil
 }
 
-func (f floatResolver) GetPositionToken() *Token {
+func (f numberResolver) GetPositionToken() *Token {
 	return f.locationToken
 }
 
-func (f floatResolver) Evaluate(ctx EvaluatorContext) (*Value, error) {
+func (f numberResolver) Evaluate(ctx EvaluatorContext) (*Value, error) {
+	if ctx.IsHighPrecision {
+		return AsValue(decimal.NewFromFloat(f.val)), nil
+	}
 	return AsValue(f.val), nil
 }
 
@@ -125,12 +129,18 @@ func (v variableResolver) String() string {
 }
 func (v variableResolver) SetPartValue(ctx EvaluatorContext, valueFunc func(ctx EvaluatorContext) (*Value, error)) error {
 	var varData reflect.Value
+	var keyName string
+	var keyInd int
 	pLen := len(v.parts)
 	for index, part := range v.parts {
-		keyName := part.name
+		if part.isFunctionCall {
+			return fmt.Errorf("can't set value of function call")
+		}
+		keyName = part.name
 		if index == 0 {
-			if keyName == "res" {
+			if _, ok := ctx.ResValues[keyName]; ok {
 				varData = reflect.ValueOf(&ctx.ResValues).Elem()
+				varData = varData.MapIndex(reflect.ValueOf(keyName))
 			} else {
 				varData = reflect.ValueOf(&ctx.Private).Elem()
 				val := varData.MapIndex(reflect.ValueOf(keyName))
@@ -143,89 +153,109 @@ func (v variableResolver) SetPartValue(ctx EvaluatorContext, valueFunc func(ctx 
 				}
 			}
 		} else {
-			isFunc := false
-			if part.typ == VariablePartTypeIdent {
-				funcValue := varData.MethodByName(part.name)
-				if funcValue.IsValid() {
-					varData = funcValue
-					isFunc = true
+			if varData.Kind() == reflect.Ptr {
+				varData = varData.Elem()
+				if !varData.IsValid() {
+					return fmt.Errorf("invalid value %v", v.String())
 				}
 			}
-			if !isFunc {
-				if varData.Kind() == reflect.Ptr {
-					varData = varData.Elem()
-					if !varData.IsValid() {
-						// Value is not valid (anymore)
-						return fmt.Errorf("invalid value %v", v.String())
-					}
-				}
-				switch part.typ {
-				case VariablePartTypeIdent:
-					switch varData.Kind() {
-					case reflect.Struct:
+			switch part.typ {
+			case VariablePartTypeIdent:
+				switch varData.Kind() {
+				case reflect.Struct:
+					if index != pLen-1 {
 						varData = varData.FieldByName(part.name)
-					case reflect.Map:
-						varData = varData.MapIndex(reflect.ValueOf(part.name))
-					default:
-						return fmt.Errorf("can't access a field by name on type %s (variable %s)",
-							varData.Kind().String(), v.String())
 					}
-				case VariablePartTypeSubscript:
-					switch varData.Kind() {
-					case reflect.String, reflect.Array, reflect.Slice:
-						eVal, err := part.subscript.Evaluate(ctx)
-						if err != nil {
-							return err
-						}
-						ind := eVal.Integer()
-						if ind >= 0 && varData.Len() > ind {
-							varData = varData.Index(ind)
-						} else {
-							return fmt.Errorf("index out of bounds %s: 0-%d (index %d)", part.name, varData.Len(), ind)
-						}
-					case reflect.Struct:
-						eVal, err := part.subscript.Evaluate(ctx)
-						if err != nil {
-							return err
-						}
-						varData = varData.FieldByName(eVal.String())
-					case reflect.Map:
-						eVal, err := part.subscript.Evaluate(ctx)
-						if err != nil {
-							return err
-						}
-						if eVal.IsNil() {
-							return fmt.Errorf("invalid value %v", v.String())
-						}
-						if !eVal.val.Type().AssignableTo(varData.Type().Key()) {
-							return fmt.Errorf("invalid key type %v", v.String())
-						}
-						keyName = eVal.String()
-						if index != pLen-1 {
-							varData = varData.MapIndex(eVal.val)
-						}
-					default:
-						return fmt.Errorf("can't access a field by index on type %s (variable %s)",
-							varData.Kind().String(), v.String())
+				case reflect.Map:
+					if index != pLen-1 {
+						varData = varData.MapIndex(reflect.ValueOf(part.name))
 					}
 				default:
-					return fmt.Errorf("unimplemented")
+					return fmt.Errorf("can't access a field by name on type %s (variable %s)",
+						varData.Kind().String(), v.String())
 				}
+			case VariablePartTypeSubscript:
+				switch varData.Kind() {
+				case reflect.String, reflect.Array, reflect.Slice:
+					eVal, err := part.subscript.Evaluate(ctx)
+					if err != nil {
+						return err
+					}
+					ind := eVal.Integer()
+					keyInd = ind
+					if ind >= 0 && varData.Len() > ind && index != pLen-1 {
+						varData = varData.Index(ind)
+					} else {
+						return fmt.Errorf("index out of bounds %s: 0-%d (index %d)", part.name, varData.Len(), ind)
+					}
+				case reflect.Struct:
+					eVal, err := part.subscript.Evaluate(ctx)
+					if err != nil {
+						return err
+					}
+					keyName = eVal.String()
+					if index != pLen-1 {
+						varData = varData.FieldByName(keyName)
+					}
+				case reflect.Map:
+					eVal, err := part.subscript.Evaluate(ctx)
+					if err != nil {
+						return err
+					}
+					if eVal.IsNil() {
+						return fmt.Errorf("invalid value %v", v.String())
+					}
+					if !eVal.val.Type().AssignableTo(varData.Type().Key()) {
+						return fmt.Errorf("invalid key type %v", v.String())
+					}
+					keyName = eVal.String()
+					if index != pLen-1 {
+						varData = varData.MapIndex(eVal.val)
+					}
+				default:
+					return fmt.Errorf("can't access a field by index on type %s (variable %s)",
+						varData.Kind().String(), v.String())
+				}
+			default:
+				return fmt.Errorf("unimplemented")
 			}
-		}
-		if !varData.IsValid() {
-			return fmt.Errorf("invalid variable %s", v.String())
-		}
-		if index == pLen-1 {
-			val, err := valueFunc(ctx)
-			if err != nil {
-				return err
-			}
-			varData.SetMapIndex(reflect.ValueOf(keyName), reflect.ValueOf(AsValue(val).val))
-			fmt.Println(varData, "----SetPartValue----", keyName, val)
+
 		}
 	}
+	if !varData.IsValid() {
+		return fmt.Errorf("invalid variable %s", v.String())
+	}
 
+	val, err := valueFunc(ctx)
+	if err != nil {
+		return err
+	}
+	switch varData.Kind() {
+	case reflect.Struct:
+		varData.FieldByName(keyName).Set(reflect.ValueOf(val.Interface()))
+	case reflect.Map:
+		varData.SetMapIndex(reflect.ValueOf(keyName), reflect.ValueOf(val.val))
+	case reflect.String:
+		varData.SetString(val.String())
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		varData.SetInt(int64(val.Integer()))
+	case reflect.Array:
+		varData.Index(keyInd).Set(reflect.ValueOf(val.Interface()))
+	case reflect.Slice:
+		varData.Index(keyInd).Set(reflect.ValueOf(val.Interface()))
+	case reflect.Float32, reflect.Float64:
+		if !varData.CanSet() {
+			return fmt.Errorf("can't set value of %s", v.String())
+		}
+		varData.SetFloat(val.Float())
+	case reflect.Bool:
+		if !varData.CanSet() {
+			return fmt.Errorf("can't set value of %s", v.String())
+		}
+		varData.SetBool(val.IsTrue())
+	default:
+		return fmt.Errorf("can't set value of %s", v.String())
+	}
 	return nil
 }
 
@@ -313,7 +343,7 @@ func (v variableResolver) Evaluate(ctx EvaluatorContext) (*Value, error) {
 			// Value is not valid (anymore)
 			return AsValue(nil), nil
 		}
-		if varData.Type() == typeOfValuePtr {
+		if varData.Type() == TypeOfValuePtr {
 			tmpValue := varData.Interface().(*Value)
 			varData = tmpValue.val
 		}
@@ -337,26 +367,34 @@ func (v variableResolver) Evaluate(ctx EvaluatorContext) (*Value, error) {
 				return nil, fmt.Errorf("'%s' must have exactly 1 or 2 output arguments, the second argument must be of type error", v.String())
 			}
 			var args []reflect.Value
+
+			ind := 0
+			if numIn > 0 && funcT.In(0) == TypeOfEvaluatorContext {
+				args = append(args, reflect.ValueOf(ctx))
+				ind = 1
+			}
 			for i, arg := range currArgs {
 				pv, err := arg.Evaluate(ctx)
 				if err != nil {
 					return nil, err
 				}
 				var fnArg reflect.Type
-				if isVariadic && i >= numIn-1 {
+				inds := ind + 1
+				if isVariadic && inds >= numIn-1 {
 					fnArg = funcT.In(numIn - 1).Elem()
 				} else {
-					fnArg = funcT.In(i)
+					fnArg = funcT.In(inds)
 				}
-				if fnArg != typeOfValuePtr {
+				fmt.Println(fnArg, "-------fnArg----------")
+				if fnArg != TypeOfValuePtr {
 					if !isVariadic {
 						if fnArg != reflect.TypeOf(pv.Interface()) && fnArg.Kind() != reflect.Interface {
-							return nil, fmt.Errorf("function input argument %d of '%s' must be of type %s or *pongo2.Value (not %T)",
+							return nil, fmt.Errorf("function input argument %d of '%s' must be of type %s or *mathxf.Value (not %T)",
 								i, v.String(), fnArg.String(), pv.Interface())
 						}
 					} else {
 						if fnArg != reflect.TypeOf(pv.Interface()) && fnArg.Kind() != reflect.Interface {
-							return nil, fmt.Errorf("function variadic input argument of '%s' must be of type %s or *pongo2.Value (not %T)",
+							return nil, fmt.Errorf("function variadic input argument of '%s' must be of type %s or *mathxf.Value (not %T)",
 								v.String(), fnArg.String(), pv.Interface())
 						}
 					}
@@ -367,11 +405,13 @@ func (v variableResolver) Evaluate(ctx EvaluatorContext) (*Value, error) {
 					} else {
 						args = append(args, reflect.ValueOf(pv.Interface()))
 					}
+				} else {
+					args = append(args, reflect.ValueOf(pv))
 				}
-				for _, arg1 := range args {
-					if arg1.Kind() == reflect.Invalid {
-						return nil, fmt.Errorf("invalid argument")
-					}
+			}
+			for _, arg1 := range args {
+				if arg1.Kind() == reflect.Invalid {
+					return nil, fmt.Errorf("invalid argument")
 				}
 			}
 			results := varData.Call(args)
@@ -382,7 +422,7 @@ func (v variableResolver) Evaluate(ctx EvaluatorContext) (*Value, error) {
 					return nil, errVal.(error)
 				}
 			}
-			if rVal.Type() != typeOfValuePtr {
+			if rVal.Type() != TypeOfValuePtr {
 				varData = reflect.ValueOf(rVal.Interface())
 			} else {
 				varData = rVal.Interface().(*Value).val

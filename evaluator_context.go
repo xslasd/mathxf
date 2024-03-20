@@ -2,6 +2,7 @@ package mathxf
 
 import (
 	"context"
+	"math"
 	"reflect"
 )
 
@@ -9,16 +10,20 @@ type VarMap map[string]reflect.Value
 
 type EvaluatorContext struct {
 	context.Context
-	Public    VarMap
-	Private   VarMap
-	ResValues VarMap
+	IsHighPrecision bool
+	Public          VarMap
+	Private         VarMap
+	ResValues       map[string]VarMap
 }
 
 func NewEvaluatorContext(ctx context.Context) EvaluatorContext {
+	public := DefFunc
+	public["pi"] = reflect.ValueOf(math.Pi)
 	return EvaluatorContext{
-		Context:   ctx,
-		Public:    make(VarMap),
-		Private:   make(VarMap),
-		ResValues: make(VarMap),
+		Context:         ctx,
+		IsHighPrecision: true,
+		Public:          public,
+		Private:         make(VarMap),
+		ResValues:       make(map[string]VarMap),
 	}
 }
