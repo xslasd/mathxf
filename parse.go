@@ -1,6 +1,8 @@
 package mathxf
 
-import "fmt"
+import (
+	"fmt"
+)
 
 func Parse(tpl string) (*Parser, error) {
 	l := lex(tpl)
@@ -11,44 +13,69 @@ func (p *Parser) ParseDocument() (*nodeDocument, error) {
 	doc := &nodeDocument{
 		Nodes: make([]INode, 0),
 	}
-	for p.peekToken().typ != TokenEOF {
-		node, err := p.parseDocElement()
+	ind := 1
+	for p.PeekToken().typ != TokenEOF {
+		node, err := p.parseDocElement(ind)
 		if err != nil {
 			return nil, err
 		}
 		doc.Nodes = append(doc.Nodes, node)
+		ind++
 	}
 	return doc, nil
 }
-func (p *Parser) parseDocElement() (INode, error) {
-	t := p.peekToken()
+func (p *Parser) parseDocElement(ind int) (INode, error) {
+	t := p.PeekToken()
 	if t.typ == TokenIdentifier {
 		tag1, ok := tags[t.val]
 		if ok {
-			p.nextToken()
+			p.NextToken()
 			return tag1.parser(p)
 		}
+	} else {
+		evl, err := p.ParseExpression()
+		if err != nil {
+			return nil, err
+		}
+		return NodeResData{name: fmt.Sprintf("res%d", ind), evl: evl}, err
 	}
-	return p.ParseExpression()
+	vRes, err := p.ParseVariable(p.NextToken())
+	if err != nil {
+		return nil, err
+	}
+	next := p.NextToken()
+	if next.typ != TokenAssign {
+		p.Backup()
+		return NodeResData{name: fmt.Sprintf("res%d", ind), evl: vRes}, nil
+	}
+
+	exp2, err := p.ParseExpression()
+	if err != nil {
+		return nil, err
+	}
+	return &assignmentResolver{
+		vRes,
+		exp2,
+	}, nil
 }
 
 func (p *Parser) WrapUntil() (*NodeWrapper, error) {
-	peek := p.peekToken()
+	peek := p.PeekToken()
 	if peek.typ == TokenLeftBigBrackets {
-		p.nextToken()
+		p.NextToken()
 		wrapper := new(NodeWrapper)
 		for {
-			t := p.peekToken()
+			t := p.PeekToken()
 			switch t.typ {
 			case TokenEOF:
-				return nil, fmt.Errorf("unclosed wrapper")
+				return nil, WrapperUnclosedErr.SetPosition(t.line, t.col)
 			case TokenRightBigBrackets:
-				p.nextToken()
+				p.NextToken()
 				return wrapper, nil
 			}
 			tag1, ok := tags[t.val]
 			if ok {
-				p.nextToken()
+				p.NextToken()
 				tagNode, err := tag1.parser(p)
 				if err != nil {
 					return nil, err
@@ -56,28 +83,15 @@ func (p *Parser) WrapUntil() (*NodeWrapper, error) {
 				wrapper.nodes = append(wrapper.nodes, tagNode)
 				continue
 			}
-			n := p.nextToken()
-			vRes, err := p.ParseVariable(n)
+			n := p.NextToken()
+			assign, err := p.ParseAssignment(n)
 			if err != nil {
 				return nil, err
 			}
-			next := p.nextToken()
-			if next.typ != TokenAssign {
-				return nil, fmt.Errorf("assign unexpected token %s", next)
-			}
-			exp2, err := p.ParseExpression()
-			if err != nil {
-				return nil, err
-			}
-			assign := &assignmentResolver{
-				vRes,
-				exp2,
-			}
-			fmt.Println("-----add----assignmentResolver-------------")
 			wrapper.nodes = append(wrapper.nodes, assign)
 		}
 	}
-	return nil, fmt.Errorf("WrapUntil unexpected token %s", peek.val)
+	return nil, UnexpectedTokenErr.SetMessagef("wrapUntil", peek.val).SetPosition(peek.line, peek.col)
 }
 
 type Parser struct {
@@ -87,7 +101,7 @@ type Parser struct {
 	peekCount  int
 }
 
-func (p *Parser) peekToken() Token {
+func (p *Parser) PeekToken() Token {
 	if p.peekCount > 0 {
 		return p.peekTokens[p.peekCount-1]
 	}
@@ -96,7 +110,7 @@ func (p *Parser) peekToken() Token {
 	return p.peekTokens[0]
 }
 
-func (p *Parser) nextToken() Token {
+func (p *Parser) NextToken() Token {
 	if p.peekCount > 0 {
 		p.peekCount--
 	} else {
@@ -105,6 +119,9 @@ func (p *Parser) nextToken() Token {
 	return p.peekTokens[p.peekCount]
 }
 
-func (p *Parser) backup() {
+func (p *Parser) Backup() {
 	p.peekCount++
+}
+func (p *Parser) Ignore() {
+	p.peekCount--
 }

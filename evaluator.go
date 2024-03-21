@@ -11,9 +11,10 @@ type IEvaluator interface {
 	GetPositionToken() *Token
 	Evaluate(ctx EvaluatorContext) (*Value, error)
 }
-type functionCallArgument interface {
-	Evaluate(ctx EvaluatorContext) (*Value, error)
-}
+
+//type functionCallArgument interface {
+//	Evaluate(ctx EvaluatorContext) (*Value, error)
+//}
 
 // Expression 处理TokenAnd 和 TokenOr
 type Expression struct {
@@ -39,36 +40,35 @@ func (e Expression) Evaluate(ctx EvaluatorContext) (*Value, error) {
 	if err != nil {
 		return nil, err
 	}
-	if e.expr2 != nil {
-		switch e.opToken.typ {
-		case TokenAnd:
-			if !v1.IsTrue() {
-				fmt.Println(" --------TokenAnd---v1---------", v1.IsTrue())
-				return AsValue(false), nil
-			} else {
-				v2, err := e.expr2.Evaluate(ctx)
-				fmt.Println(" --------TokenAnd---v2---------", v2.IsTrue())
-				if err != nil {
-					return nil, err
-				}
-				return AsValue(v2.IsTrue()), nil
-			}
-		case TokenOr:
-			if v1.IsTrue() {
-				return AsValue(true), nil
-			} else {
-				v2, err := e.expr2.Evaluate(ctx)
-				if err != nil {
-					return nil, err
-				}
-				return AsValue(v2.IsTrue()), nil
-			}
-		default:
-			return nil, nil //ctx.Error(fmt.Sprintf("unimplemented: %name", r.opToken.Val), r.opToken)
-		}
-	} else {
+	if e.expr2 == nil {
 		return v1, nil
 	}
+	switch e.opToken.typ {
+	case TokenAnd:
+		if !v1.IsTrue() {
+			return AsValue(false), nil
+		} else {
+			v2, err := e.expr2.Evaluate(ctx)
+			if err != nil {
+				return nil, err
+			}
+			return AsValue(v2.IsTrue()), nil
+		}
+	case TokenOr:
+		if v1.IsTrue() {
+			return AsValue(true), nil
+		} else {
+			v2, err := e.expr2.Evaluate(ctx)
+			if err != nil {
+				return nil, err
+			}
+			return AsValue(v2.IsTrue()), nil
+		}
+	default:
+		pos := e.opToken
+		return nil, UnknownOperatorErr.SetMessagef(pos.val).SetPosition(pos.line, pos.col)
+	}
+
 }
 
 // relationalExpression 处理  TokenEqual  TokenNotEqual  TokenLess  TokenLessEqual  TokenGreater  TokenGreaterEqual
@@ -96,10 +96,8 @@ func (r relationalExpression) Evaluate(ctx EvaluatorContext) (*Value, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	if r.expr2 == nil {
 		return v1, nil
-
 	}
 	v2, err := r.expr2.Evaluate(ctx)
 	if err != nil {
@@ -165,7 +163,8 @@ func (r relationalExpression) Evaluate(ctx EvaluatorContext) (*Value, error) {
 	case TokenIn:
 		return AsValue(v2.Contains(v1)), nil
 	default:
-		return nil, fmt.Errorf("unimplemented: %v", r.opToken.val)
+		pos := r.opToken
+		return nil, UnknownOperatorErr.SetMessagef(pos.val).SetPosition(pos.line, pos.col)
 	}
 }
 
@@ -208,7 +207,6 @@ func (s simpleExpression) Evaluate(ctx EvaluatorContext) (*Value, error) {
 			return AsValue(t1.String() + t2.String()), nil
 		}
 		if ctx.IsHighPrecision {
-			fmt.Println(t1.Decimal(), t2.Decimal(), "--------IsHighPrecision>>>>>-------------", t1.Decimal().Add(t2.Decimal()))
 			return AsValue(t1.Decimal().Add(t2.Decimal())), nil
 		}
 		if t1.IsFloat() || t2.IsFloat() {
@@ -224,7 +222,8 @@ func (s simpleExpression) Evaluate(ctx EvaluatorContext) (*Value, error) {
 		}
 		return AsValue(t1.Integer() - t2.Integer()), nil
 	default:
-		return nil, fmt.Errorf("simpleExpression unimplemented %s", s.GetPositionToken().String())
+		pos := s.opToken
+		return nil, UnknownOperatorErr.SetMessagef(pos.val).SetPosition(pos.line, pos.col)
 	}
 }
 
@@ -272,9 +271,9 @@ func (t termExpression) Evaluate(ctx EvaluatorContext) (*Value, error) {
 	case TokenDiv:
 		if ctx.IsHighPrecision {
 			divisor := f2.Decimal()
-			//todo 精度控制
 			if divisor.Cmp(decimal.Zero) == 0 {
-				return nil, fmt.Errorf("float divide by zero ")
+				pos := t.factor2.GetPositionToken()
+				return nil, DivideZeroErr.SetPosition(pos.line, pos.col)
 			}
 			return AsValue(f1.Decimal().Div(divisor)), nil
 		}
@@ -282,13 +281,15 @@ func (t termExpression) Evaluate(ctx EvaluatorContext) (*Value, error) {
 		if f1.IsFloat() || f2.IsFloat() {
 			divisor := f2.Float()
 			if divisor == 0 {
-				return nil, fmt.Errorf("float divide by zero ")
+				pos := t.factor2.GetPositionToken()
+				return nil, DivideZeroErr.SetPosition(pos.line, pos.col)
 			}
 			return AsValue(f1.Float() / divisor), nil
 		}
 		divisor := f2.Integer()
 		if divisor == 0 {
-			return nil, fmt.Errorf("integer divide by zero")
+			pos := t.factor2.GetPositionToken()
+			return nil, DivideZeroErr.SetPosition(pos.line, pos.col)
 		}
 		return AsValue(f1.Integer() / divisor), nil
 	case TokenMod:
@@ -296,17 +297,20 @@ func (t termExpression) Evaluate(ctx EvaluatorContext) (*Value, error) {
 			divisor := f2.Decimal()
 			//todo 精度控制
 			if divisor.Cmp(decimal.Zero) == 0 {
-				return nil, fmt.Errorf("float divide by zero ")
+				pos := t.factor2.GetPositionToken()
+				return nil, DivideZeroErr.SetPosition(pos.line, pos.col)
 			}
 			return AsValue(f1.Decimal().Mod(divisor)), nil
 		}
 		divisor := f2.Integer()
 		if divisor == 0 {
-			return nil, fmt.Errorf("integer divide by zero")
+			pos := t.factor2.GetPositionToken()
+			return nil, DivideZeroErr.SetPosition(pos.line, pos.col)
 		}
 		return AsValue(f1.Integer() % divisor), nil
 	default:
-		return nil, fmt.Errorf("unimplemented %v", t.opToken)
+		pos := t.opToken
+		return nil, UnknownOperatorErr.SetMessagef(pos.val).SetPosition(pos.line, pos.col)
 	}
 
 }

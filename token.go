@@ -14,7 +14,7 @@ type Token struct {
 }
 
 func (t Token) String() string {
-	return fmt.Sprintf("Token{typ: %v, line: %d,col: %d, val: %s}", t.typ, t.line, t.col, t.val)
+	return fmt.Sprintf("Token{typ: %v, line: %d,col: %d, Val: %s}", t.typ, t.line, t.col, t.val)
 }
 
 // itemType identifies the type of lex tokens.

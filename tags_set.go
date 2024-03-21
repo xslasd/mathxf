@@ -19,11 +19,11 @@ func (t tagSetNode) Execute(ctx EvaluatorContext) error {
 	return nil
 }
 func tagSetParser(parser *Parser) (INode, error) {
-	next := parser.nextToken()
+	next := parser.NextToken()
 	if next.typ != TokenIdentifier {
 		return nil, fmt.Errorf("expected identifier, got %s", next.typ)
 	}
-	if parser.nextToken().typ != TokenAssign {
+	if parser.NextToken().typ != TokenAssign {
 		return nil, fmt.Errorf("expected =, got %s", next.typ)
 	}
 	expression, err := parser.ParseExpression()

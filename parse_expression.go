@@ -6,27 +6,22 @@ import (
 	"strconv"
 )
 
-func (p *Parser) ParseAssignment() (IEvaluator, error) {
-	varName, err := p.parseVariableOrLiteral()
+func (p *Parser) ParseAssignment(t Token) (IEvaluator, error) {
+	vRes, err := p.ParseVariable(t)
 	if err != nil {
 		return nil, err
 	}
-	variable, ok := varName.(*variableResolver)
-	if !ok {
-		return nil, fmt.Errorf("expected a variable, got %T", varName)
+	next := p.NextToken()
+	if next.typ != TokenAssign {
+		return nil, fmt.Errorf("assign unexpected token %s", next)
 	}
-	peek := p.peekToken()
-	if peek.typ != TokenAssign {
-		return nil, fmt.Errorf("expected '=' after variable, got %s", peek.val)
-	}
-	p.nextToken()
-	exp, err := p.ParseExpression()
+	exp2, err := p.ParseExpression()
 	if err != nil {
 		return nil, err
 	}
 	return &assignmentResolver{
-		variable: variable,
-		value:    exp,
+		vRes,
+		exp2,
 	}, nil
 }
 
@@ -38,9 +33,9 @@ func (p *Parser) ParseExpression() (IEvaluator, error) {
 	exp := &Expression{
 		expr1: expr1,
 	}
-	peek := p.peekToken()
+	peek := p.PeekToken()
 	if peek.typ == TokenAnd || peek.typ == TokenOr {
-		op := p.nextToken()
+		op := p.NextToken()
 		expr2, err := p.ParseExpression()
 		if err != nil {
 			return nil, err
@@ -59,10 +54,10 @@ func (p *Parser) parseRelationalExpression() (IEvaluator, error) {
 	expr := &relationalExpression{
 		expr1: expr1,
 	}
-	peek := p.peekToken()
+	peek := p.PeekToken()
 	switch peek.typ {
 	case TokenEquals, TokenNotEquals, TokenGreat, TokenGreatEquals, TokenLess, TokenLessEquals:
-		op := p.nextToken()
+		op := p.NextToken()
 		expr2, err := p.parseRelationalExpression()
 		if err != nil {
 			return nil, err
@@ -72,7 +67,7 @@ func (p *Parser) parseRelationalExpression() (IEvaluator, error) {
 		expr.opToken = &op
 		return expr, nil
 	case TokenIn:
-		op := p.nextToken()
+		op := p.NextToken()
 		expr2, err := p.parseSimpleExpression()
 		if err != nil {
 			return nil, err
@@ -93,7 +88,7 @@ func (p *Parser) parseSimpleExpression() (IEvaluator, error) {
 		term1: term1,
 	}
 	for {
-		peek := p.peekToken()
+		peek := p.PeekToken()
 		switch peek.typ {
 		case TokenAdd, TokenSub:
 			if expr.opToken != nil {
@@ -101,7 +96,7 @@ func (p *Parser) parseSimpleExpression() (IEvaluator, error) {
 					term1: expr,
 				}
 			}
-			op := p.nextToken()
+			op := p.NextToken()
 			term2, err := p.parseTerm()
 			if err != nil {
 				return nil, err
@@ -126,7 +121,7 @@ func (p *Parser) parseTerm() (IEvaluator, error) {
 		factor1: factor1,
 	}
 	for {
-		peek := p.peekToken()
+		peek := p.PeekToken()
 		switch peek.typ {
 		case TokenMul, TokenDiv, TokenMod:
 			if termObj.opToken != nil {
@@ -134,7 +129,7 @@ func (p *Parser) parseTerm() (IEvaluator, error) {
 					factor1: termObj,
 				}
 			}
-			op := p.nextToken()
+			op := p.NextToken()
 			factor2, err := p.parsePower()
 			if err != nil {
 				return nil, err
@@ -157,8 +152,8 @@ func (p *Parser) parsePower() (IEvaluator, error) {
 	powerObj := &powerExpression{
 		power1: power1,
 	}
-	if p.peekToken().typ == TokenPow {
-		p.nextToken()
+	if p.PeekToken().typ == TokenPow {
+		p.NextToken()
 		power2, err := p.parsePower()
 		if err != nil {
 			return nil, err
@@ -169,14 +164,14 @@ func (p *Parser) parsePower() (IEvaluator, error) {
 	return powerObj.power1, nil
 }
 func (p *Parser) parseFactor() (IEvaluator, error) {
-	if p.peekToken().typ == TokenLeftParen {
-		p.nextToken()
+	if p.PeekToken().typ == TokenLeftParen {
+		p.NextToken()
 		expr, err := p.ParseExpression()
 		if err != nil {
 			return nil, err
 		}
-		if p.peekToken().typ == TokenRightParen {
-			p.nextToken()
+		if p.PeekToken().typ == TokenRightParen {
+			p.NextToken()
 			return expr, nil
 		}
 		return nil, errors.New("expect ')' expected after expression")
@@ -184,7 +179,7 @@ func (p *Parser) parseFactor() (IEvaluator, error) {
 	return p.parseVariableOrLiteral()
 }
 func (p *Parser) parseVariableOrLiteral() (IEvaluator, error) {
-	t := p.nextToken()
+	t := p.NextToken()
 	if t.typ == TokenEOF {
 		return nil, errors.New("unexpected EOF, expected a number, string, keyword or identifier")
 	}
@@ -219,12 +214,12 @@ func (p *Parser) parseVariableOrLiteral() (IEvaluator, error) {
 		arr := &arrayResolver{
 			locationToken: &t,
 		}
-		if p.peekToken().typ == TokenRightBrackets {
-			p.nextToken()
+		if p.PeekToken().typ == TokenRightBrackets {
+			p.NextToken()
 			return arr, nil
 		}
 		for {
-			if p.peekToken().typ == TokenEOF {
+			if p.PeekToken().typ == TokenEOF {
 				return nil, errors.New("unexpected EOF, expected a number, string, keyword or identifier")
 			}
 			exprArg, err := p.ParseExpression()
@@ -235,11 +230,11 @@ func (p *Parser) parseVariableOrLiteral() (IEvaluator, error) {
 				typ:       VariablePartTypeArray,
 				subscript: exprArg,
 			})
-			if p.peekToken().typ == TokenRightBrackets {
-				p.nextToken()
+			if p.PeekToken().typ == TokenRightBrackets {
+				p.NextToken()
 				break
 			}
-			if p.nextToken().typ != TokenComma {
+			if p.NextToken().typ != TokenComma {
 				return nil, errors.New("missing comma or closing bracket after argument")
 			}
 		}
@@ -250,6 +245,7 @@ func (p *Parser) parseVariableOrLiteral() (IEvaluator, error) {
 
 func (p *Parser) ParseVariable(t Token) (*variableResolver, error) {
 	if t.typ != TokenIdentifier {
+		fmt.Println("ParseVariable--------", t.String())
 		return nil, errors.New("unexpected token, expected a number, string, keyword or identifier")
 	}
 	resolver := &variableResolver{
@@ -260,7 +256,7 @@ func (p *Parser) ParseVariable(t Token) (*variableResolver, error) {
 		name: t.val,
 	})
 	for {
-		next := p.nextToken()
+		next := p.NextToken()
 		switch next.typ {
 		case TokenField:
 			resolver.parts = append(resolver.parts, &variablePart{
@@ -276,7 +272,7 @@ func (p *Parser) ParseVariable(t Token) (*variableResolver, error) {
 				typ:       VariablePartTypeSubscript,
 				subscript: exprSubscript,
 			})
-			if p.nextToken().typ != TokenRightBrackets {
+			if p.NextToken().typ != TokenRightBrackets {
 				return nil, errors.New("missing closing bracket after subscript")
 			}
 		case TokenLeftParen:
@@ -284,12 +280,12 @@ func (p *Parser) ParseVariable(t Token) (*variableResolver, error) {
 			funcPart.isFunctionCall = true
 		argumentLoop:
 			for {
-				peek := p.peekToken()
+				peek := p.PeekToken()
 				if peek.typ == TokenEOF {
 					return nil, errors.New("unexpected EOF, expected a number, string, keyword or identifier")
 				}
 				if peek.typ == TokenRightParen {
-					p.nextToken()
+					p.NextToken()
 					break argumentLoop
 				}
 				exprArg, err := p.ParseExpression()
@@ -297,18 +293,18 @@ func (p *Parser) ParseVariable(t Token) (*variableResolver, error) {
 					return nil, err
 				}
 				funcPart.callingArgs = append(funcPart.callingArgs, exprArg)
-				next2 := p.nextToken()
+				next2 := p.NextToken()
 				fmt.Println(next2, "--------------------------")
 				if next2.typ == TokenRightParen {
 					break argumentLoop
 				}
 				if next2.typ != TokenComma {
-					p.nextToken()
+					p.NextToken()
 					return nil, errors.New("missing comma or closing bracket after argument")
 				}
 			}
 		default:
-			p.backup()
+			p.Backup()
 		}
 		break
 	}

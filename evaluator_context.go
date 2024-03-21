@@ -14,6 +14,7 @@ type EvaluatorContext struct {
 	Public          VarMap
 	Private         VarMap
 	ResValues       map[string]VarMap
+	DefResName      string
 }
 
 func NewEvaluatorContext(ctx context.Context) EvaluatorContext {
@@ -25,5 +26,6 @@ func NewEvaluatorContext(ctx context.Context) EvaluatorContext {
 		Public:          public,
 		Private:         make(VarMap),
 		ResValues:       make(map[string]VarMap),
+		DefResName:      "res",
 	}
 }

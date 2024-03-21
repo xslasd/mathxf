@@ -5,7 +5,7 @@ import (
 	"unicode"
 )
 
-// stateFn represents the state of the scanner as a function that returns the nextToken state.
+// stateFn represents the state of the scanner as a function that returns the NextToken state.
 type stateFn func(l *lexer) stateFn
 
 func textStateFn(l *lexer) stateFn {

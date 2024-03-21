@@ -18,7 +18,7 @@ var (
 )
 
 type Value struct {
-	val reflect.Value
+	Val reflect.Value
 }
 
 // AsValue converts any given value to a pongo2.Value
@@ -30,14 +30,14 @@ type Value struct {
 //	AsValue("my string")
 func AsValue(i any) *Value {
 	return &Value{
-		val: reflect.ValueOf(i),
+		Val: reflect.ValueOf(i),
 	}
 }
 func (v *Value) getResolvedValue() reflect.Value {
-	if v.val.IsValid() && v.val.Kind() == reflect.Ptr {
-		return v.val.Elem()
+	if v.Val.IsValid() && v.Val.Kind() == reflect.Ptr {
+		return v.Val.Elem()
 	}
-	return v.val
+	return v.Val
 }
 
 // IsString checks whether the underlying value is a string
@@ -362,11 +362,11 @@ func (v *Value) Contains(other *Value) bool {
 		return fieldValue.IsValid()
 	case reflect.Map:
 		// We can't check against invalid types
-		if !other.val.IsValid() {
+		if !other.Val.IsValid() {
 			return false
 		}
 		// Ensure that map key type is equal to other'name type.
-		if baseValue.Type().Key() != other.val.Type() {
+		if baseValue.Type().Key() != other.Val.Type() {
 			return false
 		}
 
@@ -389,7 +389,7 @@ func (v *Value) Contains(other *Value) bool {
 			item := baseValue.Index(i)
 			if item.Type() == TypeOfValuePtr {
 				tmpValue := item.Interface().(*Value)
-				item = tmpValue.val
+				item = tmpValue.Val
 			}
 			if other.EqualValueTo(AsValue(item.Interface())) {
 				return true
@@ -443,7 +443,7 @@ func (v *Value) IterateOrder(fn func(idx, count int, key, value *Value) bool, em
 		keyLen := len(keys)
 		for idx, key := range keys {
 			value := v.getResolvedValue().MapIndex(key)
-			if !fn(idx, keyLen, &Value{val: key}, &Value{val: value}) {
+			if !fn(idx, keyLen, &Value{Val: key}, &Value{Val: value}) {
 				return
 			}
 		}
@@ -456,7 +456,7 @@ func (v *Value) IterateOrder(fn func(idx, count int, key, value *Value) bool, em
 
 		itemCount := v.getResolvedValue().Len()
 		for i := 0; i < itemCount; i++ {
-			items = append(items, &Value{val: v.getResolvedValue().Index(i)})
+			items = append(items, &Value{Val: v.getResolvedValue().Index(i)})
 		}
 
 		if sorted {
@@ -502,7 +502,7 @@ func (v *Value) IterateOrder(fn func(idx, count int, key, value *Value) bool, em
 			}
 
 			for i := 0; i < charCount; i++ {
-				if !fn(i, charCount, &Value{val: reflect.ValueOf(string(rs[i]))}, nil) {
+				if !fn(i, charCount, &Value{Val: reflect.ValueOf(string(rs[i]))}, nil) {
 					return
 				}
 			}
@@ -518,8 +518,8 @@ func (v *Value) IterateOrder(fn func(idx, count int, key, value *Value) bool, em
 
 // Interface gives you access to the underlying value.
 func (v *Value) Interface() any {
-	if v.val.IsValid() {
-		return v.val.Interface()
+	if v.Val.IsValid() {
+		return v.Val.Interface()
 	}
 	return nil
 }
@@ -532,13 +532,13 @@ func (v *Value) EqualValueTo(other *Value) bool {
 	if v.IsTime() && other.IsTime() {
 		return v.Time().Equal(other.Time())
 	}
-	if !v.val.IsValid() || !other.val.IsValid() {
+	if !v.Val.IsValid() || !other.Val.IsValid() {
 		return false
 	}
 	if v.IsFloat() && other.IsFloat() {
 		return v.Float() == other.Float()
 	}
-	return v.val.Equal(other.val)
+	return v.Val.Equal(other.Val)
 }
 
 type sortedKeys []reflect.Value
@@ -548,8 +548,8 @@ func (sk sortedKeys) Len() int {
 }
 
 func (sk sortedKeys) Less(i, j int) bool {
-	vi := &Value{val: sk[i]}
-	vj := &Value{val: sk[j]}
+	vi := &Value{Val: sk[i]}
+	vj := &Value{Val: sk[j]}
 	switch {
 	case vi.IsInteger() && vj.IsInteger():
 		return vi.Integer() < vj.Integer()

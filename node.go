@@ -30,3 +30,17 @@ func (wrapper *NodeWrapper) Execute(ctx EvaluatorContext) error {
 	}
 	return nil
 }
+
+type NodeResData struct {
+	name string
+	evl  IEvaluator
+}
+
+func (n NodeResData) Execute(ctx EvaluatorContext) error {
+	val, err := n.evl.Evaluate(ctx)
+	if err != nil {
+		return err
+	}
+	ctx.ResValues[ctx.DefResName][n.name] = val.Val
+	return nil
+}
