@@ -15,8 +15,19 @@ var (
 	VariableCannotFunctionErr    = New(-511, "variable '%s' cannot be used as function")
 	VariableCannotSetValueErr    = New(-512, "variable '%s' cannot be set value")
 	WrapperUnclosedErr           = New(-513, "wrapper unclosed")
-	UnexpectedTokenErr           = New(-514, "%s:unexpected token %s")
+	UnexpectedTokenErr           = New(-514, "%s:unexpected token %v")
+	MissingRightParenErr         = New(-515, "expect '%s' expected after expression")
+	UnexpectedEofErr             = New(-516, "unexpected EOF")
+	LexerTokenErr                = New(-517, "lexical analyzer error: %s")
+	TokenNotIdentifierErr        = New(-518, "token '%s' is not an identifier")
+
+	AssignObjectErr          = New(-519, "assign object error,Can only be 'Public'、'ResultMap'、Private objects;unexpected token %v")
+	VariableAlreadyExistsErr = New(-520, "variable '%s' already exists,Cannot perform set operation")
 
 	DivideZeroErr      = New(-522, "divide zero")
 	UnknownOperatorErr = New(-523, "unknown operator %s")
+
+	TagRegisteredErr       = New(-524, "tag '%s' is already registered")
+	ConstRegisteredErr     = New(-525, "const '%s' is already exists")
+	ResultKeyRegisteredErr = New(-526, "result key '%s' is already exists")
 )

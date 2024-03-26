@@ -1,25 +1,24 @@
 package mathxf
 
 import (
-	"errors"
 	"fmt"
 	"strconv"
 )
 
-func (p *Parser) ParseAssignment(t Token) (IEvaluator, error) {
+func (p *Parser) ParseAssignment(t Token) (INode, error) {
 	vRes, err := p.ParseVariable(t)
 	if err != nil {
 		return nil, err
 	}
 	next := p.NextToken()
 	if next.typ != TokenAssign {
-		return nil, fmt.Errorf("assign unexpected token %s", next)
+		return nil, UnexpectedTokenErr.SetMessagef("assignment", next.val).SetPosition(next.line, next.col)
 	}
 	exp2, err := p.ParseExpression()
 	if err != nil {
 		return nil, err
 	}
-	return &assignmentResolver{
+	return &NodeAssignment{
 		vRes,
 		exp2,
 	}, nil
@@ -62,7 +61,6 @@ func (p *Parser) parseRelationalExpression() (IEvaluator, error) {
 		if err != nil {
 			return nil, err
 		}
-		fmt.Println(expr1.GetPositionToken().val, "-----------------", op.val, "----", expr2.GetPositionToken().val)
 		expr.expr2 = expr2
 		expr.opToken = &op
 		return expr, nil
@@ -170,20 +168,22 @@ func (p *Parser) parseFactor() (IEvaluator, error) {
 		if err != nil {
 			return nil, err
 		}
-		if p.PeekToken().typ == TokenRightParen {
+		peek := p.PeekToken()
+		if peek.typ == TokenRightParen {
 			p.NextToken()
 			return expr, nil
 		}
-		return nil, errors.New("expect ')' expected after expression")
+		return nil, MissingRightParenErr.SetMessagef(")").SetPosition(peek.line, peek.col)
 	}
 	return p.parseVariableOrLiteral()
 }
 func (p *Parser) parseVariableOrLiteral() (IEvaluator, error) {
 	t := p.NextToken()
-	if t.typ == TokenEOF {
-		return nil, errors.New("unexpected EOF, expected a number, string, keyword or identifier")
-	}
 	switch t.typ {
+	case TokenEOF:
+		return nil, UnexpectedEofErr.SetPosition(t.line, t.col)
+	case TokenError:
+		return nil, LexerTokenErr.SetMessagef(t.val).SetPosition(t.line, t.col)
 	case TokenNumber:
 		f, err := strconv.ParseFloat(t.val, 64)
 		if err != nil {
@@ -210,6 +210,19 @@ func (p *Parser) parseVariableOrLiteral() (IEvaluator, error) {
 			val:           t.val,
 		}
 		return s, nil
+	case TokenCharConstant:
+		_rune, _, tail, err := strconv.UnquoteChar(t.val[1:], t.val[0])
+		if err != nil {
+			return nil, err
+		}
+		if tail != "'" {
+			return nil, fmt.Errorf("malformed character constant: %s", t.val)
+		}
+		fr := &numberResolver{
+			locationToken: &t,
+			val:           float64(_rune),
+		}
+		return fr, nil
 	case TokenLeftBrackets:
 		arr := &arrayResolver{
 			locationToken: &t,
@@ -219,8 +232,9 @@ func (p *Parser) parseVariableOrLiteral() (IEvaluator, error) {
 			return arr, nil
 		}
 		for {
-			if p.PeekToken().typ == TokenEOF {
-				return nil, errors.New("unexpected EOF, expected a number, string, keyword or identifier")
+			peek := p.PeekToken()
+			if peek.typ == TokenEOF {
+				return nil, UnexpectedEofErr.SetPosition(peek.line, peek.col)
 			}
 			exprArg, err := p.ParseExpression()
 			if err != nil {
@@ -234,8 +248,9 @@ func (p *Parser) parseVariableOrLiteral() (IEvaluator, error) {
 				p.NextToken()
 				break
 			}
-			if p.NextToken().typ != TokenComma {
-				return nil, errors.New("missing comma or closing bracket after argument")
+			next := p.NextToken()
+			if next.typ != TokenComma {
+				return nil, MissingRightParenErr.SetMessagef("]").SetPosition(next.line, next.col)
 			}
 		}
 		return arr, nil
@@ -245,8 +260,8 @@ func (p *Parser) parseVariableOrLiteral() (IEvaluator, error) {
 
 func (p *Parser) ParseVariable(t Token) (*variableResolver, error) {
 	if t.typ != TokenIdentifier {
-		fmt.Println("ParseVariable--------", t.String())
-		return nil, errors.New("unexpected token, expected a number, string, keyword or identifier")
+		fmt.Println("--------------------------", t)
+		return nil, UnexpectedTokenErr.SetMessagef("parse variable", t.val).SetPosition(t.line, t.col)
 	}
 	resolver := &variableResolver{
 		locationToken: &t,
@@ -272,8 +287,9 @@ func (p *Parser) ParseVariable(t Token) (*variableResolver, error) {
 				typ:       VariablePartTypeSubscript,
 				subscript: exprSubscript,
 			})
-			if p.NextToken().typ != TokenRightBrackets {
-				return nil, errors.New("missing closing bracket after subscript")
+			nextR := p.NextToken()
+			if nextR.typ != TokenRightBrackets {
+				return nil, MissingRightParenErr.SetMessagef("]").SetPosition(nextR.line, nextR.col)
 			}
 		case TokenLeftParen:
 			funcPart := resolver.parts[len(resolver.parts)-1]
@@ -282,7 +298,7 @@ func (p *Parser) ParseVariable(t Token) (*variableResolver, error) {
 			for {
 				peek := p.PeekToken()
 				if peek.typ == TokenEOF {
-					return nil, errors.New("unexpected EOF, expected a number, string, keyword or identifier")
+					return nil, UnexpectedEofErr.SetPosition(peek.line, peek.col)
 				}
 				if peek.typ == TokenRightParen {
 					p.NextToken()
@@ -294,19 +310,17 @@ func (p *Parser) ParseVariable(t Token) (*variableResolver, error) {
 				}
 				funcPart.callingArgs = append(funcPart.callingArgs, exprArg)
 				next2 := p.NextToken()
-				fmt.Println(next2, "--------------------------")
 				if next2.typ == TokenRightParen {
 					break argumentLoop
 				}
 				if next2.typ != TokenComma {
-					p.NextToken()
-					return nil, errors.New("missing comma or closing bracket after argument")
+					return nil, MissingRightParenErr.SetMessagef(")").SetPosition(next2.line, next2.col)
 				}
+				p.NextToken()
 			}
 		default:
 			p.Backup()
+			return resolver, nil
 		}
-		break
 	}
-	return resolver, nil
 }

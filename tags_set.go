@@ -1,30 +1,31 @@
 package mathxf
 
-import (
-	"fmt"
-	"reflect"
-)
-
 type tagSetNode struct {
 	name       string
 	expression IEvaluator
 }
 
-func (t tagSetNode) Execute(ctx EvaluatorContext) error {
+func (t tagSetNode) Execute(ctx *EvaluatorContext) error {
 	val, err := t.expression.Evaluate(ctx)
 	if err != nil {
 		return err
 	}
-	ctx.Private[t.name] = reflect.ValueOf(val)
+	_, has := ctx.ValMap[t.name]
+	if has {
+		pos := t.expression.GetPositionToken()
+		return VariableAlreadyExistsErr.SetMessagef(t.name).SetPosition(pos.line, pos.col)
+	}
+	ctx.ValMap[t.name] = NewPrivateValElement(val.Val)
 	return nil
 }
 func tagSetParser(parser *Parser) (INode, error) {
 	next := parser.NextToken()
 	if next.typ != TokenIdentifier {
-		return nil, fmt.Errorf("expected identifier, got %s", next.typ)
+		return nil, TokenNotIdentifierErr.SetMessagef(next.val).SetPosition(next.line, next.col)
 	}
-	if parser.NextToken().typ != TokenAssign {
-		return nil, fmt.Errorf("expected =, got %s", next.typ)
+	assign := parser.NextToken()
+	if assign.typ != TokenAssign {
+		return nil, UnexpectedTokenErr.SetMessagef("set parser", assign.val).SetPosition(assign.line, assign.col)
 	}
 	expression, err := parser.ParseExpression()
 	if err != nil {
@@ -35,8 +36,4 @@ func tagSetParser(parser *Parser) (INode, error) {
 		expression: expression,
 	}, nil
 
-}
-
-func init() {
-	RegisterTag("set", tagSetParser)
 }

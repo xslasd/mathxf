@@ -9,11 +9,11 @@ import (
 type IEvaluator interface {
 	INode
 	GetPositionToken() *Token
-	Evaluate(ctx EvaluatorContext) (*Value, error)
+	Evaluate(ctx *EvaluatorContext) (*Value, error)
 }
 
 //type functionCallArgument interface {
-//	Evaluate(ctx EvaluatorContext) (*Value, error)
+//	Evaluate(ctx *EvaluatorContext) (*Value, error)
 //}
 
 // Expression 处理TokenAnd 和 TokenOr
@@ -23,7 +23,7 @@ type Expression struct {
 	opToken *Token
 }
 
-func (e Expression) Execute(ctx EvaluatorContext) error {
+func (e Expression) Execute(ctx *EvaluatorContext) error {
 	_, err := e.expr1.Evaluate(ctx)
 	if err != nil {
 		return err
@@ -35,7 +35,7 @@ func (e Expression) GetPositionToken() *Token {
 	return e.expr1.GetPositionToken()
 }
 
-func (e Expression) Evaluate(ctx EvaluatorContext) (*Value, error) {
+func (e Expression) Evaluate(ctx *EvaluatorContext) (*Value, error) {
 	v1, err := e.expr1.Evaluate(ctx)
 	if err != nil {
 		return nil, err
@@ -78,7 +78,7 @@ type relationalExpression struct {
 	opToken *Token
 }
 
-func (r relationalExpression) Execute(ctx EvaluatorContext) error {
+func (r relationalExpression) Execute(ctx *EvaluatorContext) error {
 	v, err := r.Evaluate(ctx)
 	if err != nil {
 		return err
@@ -91,7 +91,7 @@ func (r relationalExpression) GetPositionToken() *Token {
 	return r.expr1.GetPositionToken()
 }
 
-func (r relationalExpression) Evaluate(ctx EvaluatorContext) (*Value, error) {
+func (r relationalExpression) Evaluate(ctx *EvaluatorContext) (*Value, error) {
 	v1, err := r.expr1.Evaluate(ctx)
 	if err != nil {
 		return nil, err
@@ -175,7 +175,7 @@ type simpleExpression struct {
 	opToken *Token
 }
 
-func (s simpleExpression) Execute(ctx EvaluatorContext) error {
+func (s simpleExpression) Execute(ctx *EvaluatorContext) error {
 	v, err := s.Evaluate(ctx)
 	if err != nil {
 		return err
@@ -188,7 +188,7 @@ func (s simpleExpression) GetPositionToken() *Token {
 	return s.term1.GetPositionToken()
 }
 
-func (s simpleExpression) Evaluate(ctx EvaluatorContext) (*Value, error) {
+func (s simpleExpression) Evaluate(ctx *EvaluatorContext) (*Value, error) {
 	t1, err := s.term1.Evaluate(ctx)
 	if err != nil {
 		return nil, err
@@ -203,7 +203,7 @@ func (s simpleExpression) Evaluate(ctx EvaluatorContext) (*Value, error) {
 	switch s.opToken.typ {
 	case TokenAdd:
 		if t1.IsString() || t2.IsString() {
-			// Result will be a string
+			// ResultMap will be a string
 			return AsValue(t1.String() + t2.String()), nil
 		}
 		if ctx.IsHighPrecision {
@@ -234,7 +234,7 @@ type termExpression struct {
 	opToken *Token
 }
 
-func (t termExpression) Execute(ctx EvaluatorContext) error {
+func (t termExpression) Execute(ctx *EvaluatorContext) error {
 	v, err := t.Evaluate(ctx)
 	if err != nil {
 		return err
@@ -247,7 +247,7 @@ func (t termExpression) GetPositionToken() *Token {
 	return t.factor1.GetPositionToken()
 }
 
-func (t termExpression) Evaluate(ctx EvaluatorContext) (*Value, error) {
+func (t termExpression) Evaluate(ctx *EvaluatorContext) (*Value, error) {
 	f1, err := t.factor1.Evaluate(ctx)
 	if err != nil {
 		return nil, err
@@ -321,7 +321,7 @@ type powerExpression struct {
 	power2 IEvaluator
 }
 
-func (p powerExpression) Execute(ctx EvaluatorContext) error {
+func (p powerExpression) Execute(ctx *EvaluatorContext) error {
 	v, err := p.Evaluate(ctx)
 	if err != nil {
 		return err
@@ -334,7 +334,7 @@ func (p powerExpression) GetPositionToken() *Token {
 	return p.power1.GetPositionToken()
 }
 
-func (p powerExpression) Evaluate(ctx EvaluatorContext) (*Value, error) {
+func (p powerExpression) Evaluate(ctx *EvaluatorContext) (*Value, error) {
 	p1, err := p.power1.Evaluate(ctx)
 	if err != nil {
 		return nil, err

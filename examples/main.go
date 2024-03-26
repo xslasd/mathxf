@@ -1,54 +1,48 @@
 package main
 
 import (
-	"context"
 	"fmt"
-	"github.com/shopspring/decimal"
 	"github.com/xslasd/mathxf"
 	"math"
-	"reflect"
 )
 
 func main() {
-	input := `ssss`
-	p, err := mathxf.Parse(input)
+	input := `
+set f=3
+if cc.aa.dd>1 and f<100{
+  res.bb=3
+}else{
+res.cc=20
+}
+`
+	tpl, err := mathxf.NewTemplate(input)
 	if err != nil {
-		fmt.Println("---------err != nil---------", err)
 		panic(err)
 	}
-	doc, err := p.ParseDocument()
+	m := map[string]any{
+		"cc": map[string]any{
+			"aa": map[string]any{
+				"dd": 100,
+			},
+		},
+	}
+	tpl.SetPublicVarMap(m)
+	tpl.AddFuncOrConst("ff", 100)
+	_, err = tpl.Execute()
 	if err != nil {
-		code := mathxf.Cause(err)
-		line, col := code.Position()
-		fmt.Println(err, "--------", code.Message(), "------------err", line, col)
+		fmt.Println("Execute:", err)
 		return
 	}
-
-	ctx := mathxf.NewEvaluatorContext(context.Background())
-	ctx.Private["ff"] = reflect.ValueOf(0.03)
-	ctx.Private["cc"] = reflect.ValueOf(33)
-	ctx.ResValues["res"] = make(mathxf.VarMap)
-	err = doc.Execute(ctx)
-	if err != nil {
-		code := mathxf.Cause(err)
-		line, col := code.Position()
-		fmt.Println(err, "--------", code.Message(), "------------err", line, col)
-		return
-	}
-
-	for k, v := range ctx.ResValues["res"] {
+	for k, v := range tpl.PublicValMap() {
 		//val, _ := v.Interface().(decimal.Decimal)
 		////f := val.String()
-
-		fmt.Printf("%s--ResValues---%v %T\n", k, v, v.Interface())
+		fmt.Printf("--Public.%s---%v\n", k, v.Val)
 	}
-	value := decimal.NewFromFloat(123.456789)
-
-	// 保留3位小数
-	roundedValue := value.Round(3)
-
-	// 输出结果
-	fmt.Println(roundedValue.Float64())
+	for k, v := range tpl.ResultValMap() {
+		//val, _ := v.Interface().(decimal.Decimal)
+		////f := val.String()
+		fmt.Printf("--Result.%s---%v\n", k, v.Val)
+	}
 }
 
 func Round(f float64, n int) float64 {

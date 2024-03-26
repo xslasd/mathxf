@@ -7,38 +7,12 @@ import (
 	"strings"
 )
 
-type assignmentResolver struct {
-	variable *variableResolver
-	value    IEvaluator
-}
-
-func (a assignmentResolver) Execute(ctx EvaluatorContext) error {
-	val, err := a.Evaluate(ctx)
-	if err != nil {
-		return err
-	}
-	fmt.Println("--------assignmentResolver---------Execute---------", val)
-	return nil
-}
-
-func (a assignmentResolver) GetPositionToken() *Token {
-	return a.variable.GetPositionToken()
-}
-
-func (a assignmentResolver) Evaluate(ctx EvaluatorContext) (*Value, error) {
-	err := a.variable.SetPartValue(ctx, a.value)
-	if err != nil {
-		return nil, err
-	}
-	return AsValue(nil), nil
-}
-
 type numberResolver struct {
 	locationToken *Token
 	val           float64
 }
 
-func (f numberResolver) Execute(ctx EvaluatorContext) error {
+func (f numberResolver) Execute(ctx *EvaluatorContext) error {
 	val, err := f.Evaluate(ctx)
 	if err != nil {
 		return err
@@ -51,7 +25,7 @@ func (f numberResolver) GetPositionToken() *Token {
 	return f.locationToken
 }
 
-func (f numberResolver) Evaluate(ctx EvaluatorContext) (*Value, error) {
+func (f numberResolver) Evaluate(ctx *EvaluatorContext) (*Value, error) {
 	if ctx.IsHighPrecision {
 		return AsValue(decimal.NewFromFloat(f.val)), nil
 	}
@@ -63,7 +37,7 @@ type boolResolver struct {
 	val           bool
 }
 
-func (b boolResolver) Execute(ctx EvaluatorContext) error {
+func (b boolResolver) Execute(ctx *EvaluatorContext) error {
 	val, err := b.Evaluate(ctx)
 	if err != nil {
 		return err
@@ -76,7 +50,7 @@ func (b boolResolver) GetPositionToken() *Token {
 	return b.locationToken
 }
 
-func (b boolResolver) Evaluate(ctx EvaluatorContext) (*Value, error) {
+func (b boolResolver) Evaluate(ctx *EvaluatorContext) (*Value, error) {
 	return AsValue(b.val), nil
 }
 
@@ -85,7 +59,7 @@ type stringResolver struct {
 	val           string
 }
 
-func (s stringResolver) Execute(ctx EvaluatorContext) error {
+func (s stringResolver) Execute(ctx *EvaluatorContext) error {
 	val, err := s.Evaluate(ctx)
 	if err != nil {
 		return err
@@ -98,7 +72,7 @@ func (s stringResolver) GetPositionToken() *Token {
 	return s.locationToken
 }
 
-func (s stringResolver) Evaluate(ctx EvaluatorContext) (*Value, error) {
+func (s stringResolver) Evaluate(ctx *EvaluatorContext) (*Value, error) {
 	return AsValue(s.val), nil
 }
 
@@ -107,7 +81,7 @@ type variableResolver struct {
 	parts         []*variablePart
 }
 
-func (v variableResolver) Execute(ctx EvaluatorContext) error {
+func (v variableResolver) Execute(ctx *EvaluatorContext) error {
 	val, err := v.Evaluate(ctx)
 	if err != nil {
 		return err
@@ -126,34 +100,51 @@ func (v variableResolver) String() string {
 	}
 	return strings.Join(parts, ".")
 }
-func (v variableResolver) SetPartValue(ctx EvaluatorContext, valueEvaluator IEvaluator) error {
+func (v variableResolver) SetPartValue(ctx *EvaluatorContext, valueEvaluator IEvaluator) error {
 	var varData reflect.Value
 	var keyName string
 	var keyInd int
 	pLen := len(v.parts)
+	var isPublicVal bool
+	var isResultVal bool
 	for index, part := range v.parts {
+		isPublicVal = false
 		keyName = part.name
 		if part.isFunctionCall {
 			pos := v.locationToken
 			return VariableCannotFunctionErr.SetMessagef(keyName).SetPosition(pos.line, pos.col)
 		}
 		if index == 0 {
-			if _, ok := ctx.ResValues[keyName]; ok {
-				varData = reflect.ValueOf(&ctx.ResValues).Elem()
-				varData = varData.MapIndex(reflect.ValueOf(keyName))
-			} else {
-				varData = reflect.ValueOf(&ctx.Private).Elem()
-				val := varData.MapIndex(reflect.ValueOf(keyName))
-				if !val.IsValid() {
-					varData = reflect.ValueOf(&ctx.Public).Elem()
-					val = varData.MapIndex(reflect.ValueOf(keyName))
-					if !val.IsValid() {
-						pos := v.locationToken
-						return VariableInvalidErr.SetMessagef(keyName).SetPosition(pos.line, pos.col)
-					}
+			if valEle, ok := ctx.ValMap[keyName]; ok {
+				switch valEle.ValType {
+				case ConstVal:
+					return VariableCannotSetValueErr.SetMessagef(keyName).SetPosition(v.locationToken.line, v.locationToken.col)
+				case PublicVal:
+					isPublicVal = true
+				case ResultVal:
+					isResultVal = true
 				}
+				varData = reflect.ValueOf(&ctx.ValMap).Elem()
+				varData = varData.MapIndex(reflect.ValueOf(keyName)).Elem()
+			} else {
+				pos := v.locationToken
+				return AssignObjectErr.SetMessagef(keyName).SetPosition(pos.line, pos.col)
 			}
 		} else {
+			if varData.IsValid() && varData.Type() == TypeOfValElementPrt.Elem() {
+				va := varData.FieldByName("Val")
+				if !va.IsValid() {
+					if isResultVal {
+						varData.FieldByName("Val").Set(reflect.ValueOf(make(ValMap)))
+						varData = varData.FieldByName("Val")
+					}
+					fmt.Println(varData, "-------!-isResultVal-------------", part.name)
+				} else {
+					varData = varData.FieldByName("Val")
+					varData = varData.Interface().(reflect.Value)
+				}
+				fmt.Println(varData.Type(), "--------TypeOfValElementPrt-------------", part.name)
+			}
 			if varData.Kind() == reflect.Ptr {
 				varData = varData.Elem()
 				if !varData.IsValid() {
@@ -161,18 +152,61 @@ func (v variableResolver) SetPartValue(ctx EvaluatorContext, valueEvaluator IEva
 					return VariableCannotSetValueErr.SetMessagef(v.String()).SetPosition(pos.line, pos.col)
 				}
 			}
+			valM, ok := varData.Interface().(ValMap)
+			if ok {
+				varData = reflect.ValueOf(valM)
+			}
+			fmt.Println(ok, varData.Kind(), "-----------part.typ-----------", part.name)
 			switch part.typ {
 			case VariablePartTypeIdent:
 				switch varData.Kind() {
+				case reflect.Interface:
+					if index != pLen-1 {
+						fmt.Println("----reflect.Interface", part.name)
+						pos := v.locationToken
+						return VariableNotAccessErr.SetMessagef("reflect.Struct or reflect.Map", varData.Kind().String()).SetPosition(pos.line, pos.col)
+					}
+					fmt.Println("----------------------------")
 				case reflect.Struct:
+					fmt.Println(varData.Interface(), varData.Type(), "--------Struct-------------", part.name)
+					if varData.Type() == TypeOfValElementPrt.Elem() {
+						fmt.Println("------------TypeOfValElementPrt----------------")
+						va := varData.FieldByName("Val")
+						if !va.IsValid() {
+							if isResultVal {
+								varData.FieldByName("Val").Set(reflect.ValueOf(make(ValMap)))
+								varData = varData.FieldByName("Val").MapIndex(reflect.ValueOf(part.name))
+							}
+						}
+					}
 					if index != pLen-1 {
 						varData = varData.FieldByName(part.name)
 					}
 				case reflect.Map:
-					if index != pLen-1 {
-						varData = varData.MapIndex(reflect.ValueOf(part.name))
+					fmt.Println(varData, "--------Map-------------", part.name)
+					partVal := varData.MapIndex(reflect.ValueOf(part.name))
+					fmt.Println(partVal, "-------")
+					if !partVal.IsValid() {
+						if !isResultVal {
+							pos := v.locationToken
+							return VariableInvalidErr.SetMessagef(v.String()).SetPosition(pos.line, pos.col)
+						} else {
+							if index != pLen-1 {
+								valEle := reflect.ValueOf(reflect.ValueOf(make(ValMap)))
+								varData.SetMapIndex(reflect.ValueOf(part.name), valEle)
+								varData = varData.MapIndex(reflect.ValueOf(part.name))
+							}
+						}
+					} else {
+						if index != pLen-1 {
+							varData = partVal.Elem()
+						}
 					}
+					//if index != pLen-1 {
+					//	varData = varData.MapIndex(reflect.ValueOf(part.name))
+					//}
 				default:
+					fmt.Println("---------------VariableNotAccessErr-----------------")
 					pos := v.locationToken
 					return VariableNotAccessErr.SetMessagef("reflect.Struct or reflect.Map", varData.Kind().String()).SetPosition(pos.line, pos.col)
 				}
@@ -227,6 +261,7 @@ func (v variableResolver) SetPartValue(ctx EvaluatorContext, valueEvaluator IEva
 			}
 		}
 	}
+
 	if !varData.IsValid() {
 		pos := v.locationToken
 		return VariableInvalidErr.SetMessagef(v.String()).SetPosition(pos.line, pos.col)
@@ -234,15 +269,31 @@ func (v variableResolver) SetPartValue(ctx EvaluatorContext, valueEvaluator IEva
 
 	val, err := valueEvaluator.Evaluate(ctx)
 	if err != nil {
-		code := Cause(err)
-		pos := valueEvaluator.GetPositionToken()
-		return code.SetPosition(pos.line, pos.col)
+		return err
 	}
 	switch varData.Kind() {
 	case reflect.Struct:
-		varData.FieldByName(keyName).Set(reflect.ValueOf(val.Interface()))
+		if varData.Type() == TypeOfValElementPrt.Elem() {
+			if isPublicVal {
+				varData.FieldByName("IsSet").Set(reflect.ValueOf(true))
+			}
+			varData.FieldByName("Val").Set(reflect.ValueOf(val.Val))
+		} else {
+			varData.FieldByName(keyName).Set(reflect.ValueOf(val.Val))
+		}
 	case reflect.Map:
-		varData.SetMapIndex(reflect.ValueOf(keyName), reflect.ValueOf(val.Val))
+		if varData.Type() == TypeOfValElementMapPrt.Elem() {
+			valMap := varData.MapIndex(reflect.ValueOf(keyName))
+			if !valMap.IsValid() {
+				valEle := reflect.ValueOf(NewResultValElement(val))
+				varData.SetMapIndex(reflect.ValueOf(keyName), valEle)
+			} else {
+				valMap.Elem().FieldByName("Val").Set(reflect.ValueOf(val))
+			}
+		} else {
+			fmt.Println(varData, "keyName", keyName, val.Val)
+			varData.SetMapIndex(reflect.ValueOf(keyName), reflect.ValueOf(val.Val))
+		}
 	case reflect.String:
 		varData.SetString(val.String())
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
@@ -270,92 +321,102 @@ func (v variableResolver) SetPartValue(ctx EvaluatorContext, valueEvaluator IEva
 	return nil
 }
 
-func (v variableResolver) Evaluate(ctx EvaluatorContext) (*Value, error) {
+func (v variableResolver) Evaluate(ctx *EvaluatorContext) (*Value, error) {
 	var varData reflect.Value
+	var isFunc bool
 	for index, part := range v.parts {
+		isFunc = false
 		if index == 0 {
 			var ok bool
 			name := part.name
-			varData, ok = ctx.Private[name]
-			if !ok {
-				varData, ok = ctx.Public[name]
-			}
-			if !ok {
+			valEle, ok := ctx.ValMap[name]
+			if ok {
+				varData = reflect.ValueOf(valEle.Val)
+				varData = varData.Interface().(reflect.Value)
+				isFunc = valEle.IsFunc
+			} else {
 				pos := v.locationToken
 				return nil, VariableInvalidErr.SetMessagef(name).SetPosition(pos.line, pos.col)
 			}
 		} else {
-			isFunc := false
-			if part.typ == VariablePartTypeIdent {
-				funcValue := varData.MethodByName(part.name)
-				if funcValue.IsValid() {
-					varData = funcValue
-					isFunc = true
+			if varData.Type() == TypeOfValElementPrt {
+				tmpValue := varData.Interface().(*ValElement)
+				isFunc = true
+				varData = reflect.ValueOf(tmpValue.Val)
+			}
+			if varData.Kind() == reflect.Ptr {
+				varData = varData.Elem()
+				if !varData.IsValid() {
+					// Value is not valid (anymore)
+					return AsValue(nil), nil
 				}
 			}
-			if !isFunc {
-				if varData.Kind() == reflect.Ptr {
-					varData = varData.Elem()
-					if !varData.IsValid() {
-						// Value is not valid (anymore)
+			if varData.Kind() == reflect.Interface {
+				varData = reflect.ValueOf(varData.Interface())
+			}
+			fmt.Println("----MapMap-------------", part.name, varData.Type())
+			switch part.typ {
+			case VariablePartTypeIdent:
+				switch varData.Kind() {
+				case reflect.Func:
+					funcValue := varData.MethodByName(part.name)
+					if funcValue.IsValid() {
+						varData = funcValue
+						isFunc = true
+					}
+				case reflect.Struct:
+					varData = varData.FieldByName(part.name)
+				case reflect.Map:
+					varData = varData.MapIndex(reflect.ValueOf(part.name))
+				default:
+					pos := v.locationToken
+					return nil, VariableNotAccessErr.SetMessagef(varData.Kind().String(), v.String()).SetPosition(pos.line, pos.col)
+				}
+
+			case VariablePartTypeSubscript:
+				switch varData.Kind() {
+				case reflect.String, reflect.Array, reflect.Slice:
+					eVal, err := part.subscript.Evaluate(ctx)
+					if err != nil {
+						return nil, err
+					}
+					ind := eVal.Integer()
+					if ind >= 0 && varData.Len() > ind {
+						varData = varData.Index(ind)
+					} else {
+						pos := part.subscript.GetPositionToken()
+						return nil, ArgumentOutBoundsErr.SetMessagef(part.name, varData.Len(), ind).SetPosition(pos.line, pos.col)
+					}
+				case reflect.Struct:
+					eVal, err := part.subscript.Evaluate(ctx)
+					if err != nil {
+						return nil, err
+					}
+					varData = varData.FieldByName(eVal.String())
+				case reflect.Map:
+					eVal, err := part.subscript.Evaluate(ctx)
+					if err != nil {
+						return nil, err
+					}
+					if eVal.IsNil() {
 						return AsValue(nil), nil
 					}
-				}
-				switch part.typ {
-				case VariablePartTypeIdent:
-					switch varData.Kind() {
-					case reflect.Struct:
-						varData = varData.FieldByName(part.name)
-					case reflect.Map:
-						varData = varData.MapIndex(reflect.ValueOf(part.name))
-					default:
-						pos := v.locationToken
-						return nil, VariableNotAccessErr.SetMessagef(varData.Kind().String(), v.String()).SetPosition(pos.line, pos.col)
-					}
-				case VariablePartTypeSubscript:
-					switch varData.Kind() {
-					case reflect.String, reflect.Array, reflect.Slice:
-						eVal, err := part.subscript.Evaluate(ctx)
-						if err != nil {
-							return nil, err
-						}
-						ind := eVal.Integer()
-						if ind >= 0 && varData.Len() > ind {
-							varData = varData.Index(ind)
-						} else {
-							pos := part.subscript.GetPositionToken()
-							return nil, ArgumentOutBoundsErr.SetMessagef(part.name, varData.Len(), ind).SetPosition(pos.line, pos.col)
-						}
-					case reflect.Struct:
-						eVal, err := part.subscript.Evaluate(ctx)
-						if err != nil {
-							return nil, err
-						}
-						varData = varData.FieldByName(eVal.String())
-					case reflect.Map:
-						eVal, err := part.subscript.Evaluate(ctx)
-						if err != nil {
-							return nil, err
-						}
-						if eVal.IsNil() {
-							return AsValue(nil), nil
-						}
-						if eVal.Val.Type().AssignableTo(varData.Type().Key()) {
-							varData = varData.MapIndex(eVal.Val)
-						} else {
-							return AsValue(nil), nil
-						}
-					default:
-						pos := v.locationToken
-						return nil, VariableNotAccessErr.SetMessagef(varData.Kind().String(), v.String()).SetPosition(pos.line, pos.col)
+					if eVal.Val.Type().AssignableTo(varData.Type().Key()) {
+						varData = varData.MapIndex(eVal.Val)
+					} else {
+						return AsValue(nil), nil
 					}
 				default:
 					pos := v.locationToken
-					return nil, VariableInvalidErr.SetMessagef(v.String()).SetPosition(pos.line, pos.col)
+					return nil, VariableNotAccessErr.SetMessagef(varData.Kind().String(), v.String()).SetPosition(pos.line, pos.col)
 				}
+			default:
+				pos := v.locationToken
+				return nil, VariableInvalidErr.SetMessagef(v.String()).SetPosition(pos.line, pos.col)
 			}
 		}
 		if !varData.IsValid() {
+			fmt.Println("-------???-----", varData, part.name)
 			return AsValue(nil), nil
 		}
 		if varData.Type() == TypeOfValuePtr {
@@ -366,7 +427,7 @@ func (v variableResolver) Evaluate(ctx EvaluatorContext) (*Value, error) {
 			varData = reflect.ValueOf(varData.Interface())
 		}
 		if part.isFunctionCall {
-			if varData.Kind() != reflect.Func {
+			if !isFunc {
 				pos := v.locationToken
 				return nil, VariableNotFunctionErr.SetMessagef(v.String()).SetPosition(pos.line, pos.col)
 			}
@@ -493,7 +554,7 @@ type arrayResolver struct {
 	parts         []*variablePart
 }
 
-func (a arrayResolver) Execute(ctx EvaluatorContext) error {
+func (a arrayResolver) Execute(ctx *EvaluatorContext) error {
 	val, err := a.Evaluate(ctx)
 	if err != nil {
 		return err
@@ -506,7 +567,7 @@ func (a arrayResolver) GetPositionToken() *Token {
 	return a.locationToken
 }
 
-func (a arrayResolver) Evaluate(ctx EvaluatorContext) (*Value, error) {
+func (a arrayResolver) Evaluate(ctx *EvaluatorContext) (*Value, error) {
 	if len(a.parts) == 0 {
 		return &Value{}, nil
 	}

@@ -1,24 +1,19 @@
 package mathxf
 
-import "fmt"
-
 type tagIfNode struct {
 	conditions []IEvaluator
 	wrappers   []*NodeWrapper
 }
 
-func (t *tagIfNode) Execute(ctx EvaluatorContext) error {
-	fmt.Println("========tagIfNode=======Execute====")
+func (t *tagIfNode) Execute(ctx *EvaluatorContext) error {
 	cLength := len(t.conditions)
 	wLength := len(t.wrappers)
-
 	for index, condition := range t.conditions {
 		res, err := condition.Evaluate(ctx)
 		if err != nil {
 			return err
 		}
 		if res.IsTrue() {
-			fmt.Println("========tagIfNode======IsTrue=====", res.IsFloat())
 			return t.wrappers[index].Execute(ctx)
 		}
 		last := index + 1
@@ -61,7 +56,4 @@ func tagIfParser(parser *Parser) (INode, error) {
 		}
 		return ifNode, nil
 	}
-}
-func init() {
-	RegisterTag("if", tagIfParser)
 }

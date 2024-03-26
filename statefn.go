@@ -12,15 +12,6 @@ func textStateFn(l *lexer) stateFn {
 	for l.state = baseStateFn; l.state != nil; {
 		l.state = l.state(l)
 	}
-	if l.bracketDepth > 0 {
-		l.emitError("unexpected left bracket %#U", '[')
-	}
-	if l.parenDepth > 0 {
-		l.emitError("unexpected left paren %#U", '(')
-	}
-	if l.bigBracketDepth > 0 {
-		l.emitError("unexpected left bracket %#U", '{')
-	}
 	l.emit(TokenEOF)
 	return nil
 }
@@ -151,31 +142,16 @@ func baseStateFn(l *lexer) stateFn {
 		return identifierStateFn
 	case r == '[':
 		l.emit(TokenLeftBrackets)
-		l.bracketDepth++
 	case r == ']':
 		l.emit(TokenRightBrackets)
-		l.bracketDepth--
-		if l.bracketDepth < 0 {
-			return l.emitError("unexpected right bracket %#U", r)
-		}
 	case r == '{':
 		l.emit(TokenLeftBigBrackets)
-		l.bigBracketDepth++
 	case r == '}':
 		l.emit(TokenRightBigBrackets)
-		l.bigBracketDepth--
-		if l.bigBracketDepth < 0 {
-			return l.emitError("unexpected right bracket %#U", r)
-		}
 	case r == '(':
 		l.emit(TokenLeftParen)
-		l.parenDepth++
 	case r == ')':
 		l.emit(TokenRightParen)
-		l.parenDepth--
-		if l.parenDepth < 0 {
-			return l.emitError("unexpected right paren %#U", r)
-		}
 	case r == '\'':
 		return charStateFn
 	case r <= unicode.MaxASCII && unicode.IsPrint(r):
@@ -189,12 +165,7 @@ func charStateFn(l *lexer) stateFn {
 Loop:
 	for {
 		switch l.next() {
-		case '\\':
-			if r := l.next(); r != eof && r != '\n' {
-				break
-			}
-			fallthrough
-		case eof, '\n':
+		case eof:
 			return l.emitError("unterminated character constant")
 		case '\'':
 			break Loop
@@ -288,20 +259,4 @@ func identifierStateFn(l *lexer) stateFn {
 			return baseStateFn
 		}
 	}
-}
-
-func fieldStateFn(l *lexer) stateFn {
-	for {
-		r := l.next()
-		if !isAlphaNumeric(r) {
-			l.backup()
-			break
-		}
-	}
-	if l.pos-l.start <= 1 {
-		l.next()
-		return l.emitError("bad character: %q", l.value())
-	}
-	l.emit(TokenField)
-	return baseStateFn
 }

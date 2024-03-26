@@ -22,10 +22,6 @@ type lexer struct {
 	line  int
 	col   int
 	width int
-
-	bigBracketDepth int
-	bracketDepth    int
-	parenDepth      int
 }
 
 func lex(input string) *lexer {

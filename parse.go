@@ -7,7 +7,7 @@ import (
 func Parse(tpl string) (*Parser, error) {
 	l := lex(tpl)
 	l.run()
-	return &Parser{lex: l}, nil
+	return &Parser{lex: l, tags: defTags()}, nil
 }
 func (p *Parser) ParseDocument() (*nodeDocument, error) {
 	doc := &nodeDocument{
@@ -17,7 +17,7 @@ func (p *Parser) ParseDocument() (*nodeDocument, error) {
 	for p.PeekToken().typ != TokenEOF {
 		node, err := p.parseDocElement(ind)
 		if err != nil {
-			return nil, err
+			return nil, ParseErr(err)
 		}
 		doc.Nodes = append(doc.Nodes, node)
 		ind++
@@ -27,10 +27,10 @@ func (p *Parser) ParseDocument() (*nodeDocument, error) {
 func (p *Parser) parseDocElement(ind int) (INode, error) {
 	t := p.PeekToken()
 	if t.typ == TokenIdentifier {
-		tag1, ok := tags[t.val]
+		tagParser, ok := p.tags[t.val]
 		if ok {
 			p.NextToken()
-			return tag1.parser(p)
+			return tagParser(p)
 		}
 	} else {
 		evl, err := p.ParseExpression()
@@ -53,7 +53,7 @@ func (p *Parser) parseDocElement(ind int) (INode, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &assignmentResolver{
+	return &NodeAssignment{
 		vRes,
 		exp2,
 	}, nil
@@ -73,10 +73,10 @@ func (p *Parser) WrapUntil() (*NodeWrapper, error) {
 				p.NextToken()
 				return wrapper, nil
 			}
-			tag1, ok := tags[t.val]
+			tagParser, ok := p.tags[t.val]
 			if ok {
 				p.NextToken()
-				tagNode, err := tag1.parser(p)
+				tagNode, err := tagParser(p)
 				if err != nil {
 					return nil, err
 				}
@@ -99,6 +99,8 @@ type Parser struct {
 
 	peekTokens [3]Token // three-token lookahead for Parser.
 	peekCount  int
+
+	tags map[string]TagParser
 }
 
 func (p *Parser) PeekToken() Token {

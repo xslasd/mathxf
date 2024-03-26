@@ -4,25 +4,19 @@ import "fmt"
 
 type TagParser func(parser *Parser) (INode, error)
 
-type tag struct {
-	name   string
-	parser TagParser
-}
-
-var tags map[string]*tag
-
-func init() {
-	tags = make(map[string]*tag)
-}
-func RegisterTag(name string, parserFn TagParser) error {
-	_, ok := tags[name]
+func (t *template) RegisterTag(name string, parserFn TagParser) error {
+	_, ok := t.tags[name]
 	if ok {
-		return fmt.Errorf("tag with name '%s' is already registered", name)
+		return t.ParseErr()(TagRegisteredErr.SetMessagef(name))
 	}
-	fmt.Printf("registering tag '%s' %T \n", name, parserFn)
-	tags[name] = &tag{
-		name:   name,
-		parser: parserFn,
-	}
+	fmt.Printf("registering tag '%s' \n", name)
+	t.tags[name] = parserFn
 	return nil
+
+}
+func defTags() map[string]TagParser {
+	return map[string]TagParser{
+		"if":  tagIfParser,
+		"set": tagSetParser,
+	}
 }

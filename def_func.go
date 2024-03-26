@@ -3,34 +3,33 @@ package mathxf
 import (
 	"github.com/shopspring/decimal"
 	"math"
-	"reflect"
 )
 
-var DefFunc = map[string]reflect.Value{
-	"sum":   reflect.ValueOf(defSum),
-	"avg":   reflect.ValueOf(defAvg),
-	"max":   reflect.ValueOf(defMax),
-	"min":   reflect.ValueOf(defMin),
-	"cbrt":  reflect.ValueOf(defCbrt),
-	"sqrt":  reflect.ValueOf(defSqrt),
-	"round": reflect.ValueOf(defRound),
-	"floor": reflect.ValueOf(defFloor),
-	"ceil":  reflect.ValueOf(defCeil),
-	"abs":   reflect.ValueOf(defAbs),
-	"sin":   reflect.ValueOf(defSin),
-	"cos":   reflect.ValueOf(defCos),
-	"tan":   reflect.ValueOf(defTan),
-	"asin":  reflect.ValueOf(defAsin),
-	"acos":  reflect.ValueOf(defAcos),
-	"atan":  reflect.ValueOf(defAtan),
-	"atan2": reflect.ValueOf(defAtan2),
-	"sinh":  reflect.ValueOf(defSinh),
-	"cosh":  reflect.ValueOf(defCosh),
-	"tanh":  reflect.ValueOf(defTanh),
-	"asinh": reflect.ValueOf(defAsinh),
+var DefFunc = map[string]*ValElement{
+	"sum":   NewConstValElement(defSum, true),
+	"avg":   NewConstValElement(defAvg, true),
+	"max":   NewConstValElement(defMax, true),
+	"min":   NewConstValElement(defMin, true),
+	"cbrt":  NewConstValElement(defCbrt, true),
+	"sqrt":  NewConstValElement(defSqrt, true),
+	"round": NewConstValElement(defRound, true),
+	"floor": NewConstValElement(defFloor, true),
+	"ceil":  NewConstValElement(defCeil, true),
+	"abs":   NewConstValElement(defAbs, true),
+	"sin":   NewConstValElement(defSin, true),
+	"cos":   NewConstValElement(defCos, true),
+	"tan":   NewConstValElement(defTan, true),
+	"asin":  NewConstValElement(defAsin, true),
+	"acos":  NewConstValElement(defAcos, true),
+	"atan":  NewConstValElement(defAtan, true),
+	"atan2": NewConstValElement(defAtan2, true),
+	"sinh":  NewConstValElement(defSinh, true),
+	"cosh":  NewConstValElement(defCosh, true),
+	"tanh":  NewConstValElement(defTanh, true),
+	"asinh": NewConstValElement(defAsinh, true),
 }
 
-func defSum(ctx EvaluatorContext, args ...*Value) (*Value, error) {
+func defSum(ctx *EvaluatorContext, args ...*Value) (*Value, error) {
 	alen := len(args)
 	if ctx.IsHighPrecision {
 		var sumV decimal.Decimal
@@ -58,7 +57,7 @@ func defSum(ctx EvaluatorContext, args ...*Value) (*Value, error) {
 
 	return AsValue(sumV), nil
 }
-func defAvg(ctx EvaluatorContext, args ...*Value) (*Value, error) {
+func defAvg(ctx *EvaluatorContext, args ...*Value) (*Value, error) {
 	alen := len(args)
 	if alen == 0 {
 		return nil, ArgumentNotNumberErr.SetMessagef("avg")
@@ -93,7 +92,7 @@ func defAvg(ctx EvaluatorContext, args ...*Value) (*Value, error) {
 	return AsValue(sumV / float64(len(args))), nil
 }
 
-func defMax(ctx EvaluatorContext, args ...*Value) (*Value, error) {
+func defMax(ctx *EvaluatorContext, args ...*Value) (*Value, error) {
 	alen := len(args)
 	if alen == 0 {
 		return nil, ArgumentNotEnoughErr.SetMessagef("max", ">=1", 0)
@@ -128,7 +127,7 @@ func defMax(ctx EvaluatorContext, args ...*Value) (*Value, error) {
 	return AsValue(maxV), nil
 }
 
-func defMin(ctx EvaluatorContext, args ...*Value) (*Value, error) {
+func defMin(ctx *EvaluatorContext, args ...*Value) (*Value, error) {
 	alen := len(args)
 	if alen == 0 {
 		return nil, ArgumentNotNumberErr.SetMessagef("min")
@@ -175,7 +174,7 @@ func defSqrt(arg *Value) (*Value, error) {
 	return AsValue(math.Sqrt(arg.Float())), nil
 }
 
-func defRound(ctx EvaluatorContext, arg *Value, n *Value) (*Value, error) {
+func defRound(ctx *EvaluatorContext, arg *Value, n *Value) (*Value, error) {
 	if !arg.IsNumber() || !n.IsNumber() {
 		return nil, ArgumentNotNumberErr.SetMessagef("round")
 	}
@@ -185,7 +184,7 @@ func defRound(ctx EvaluatorContext, arg *Value, n *Value) (*Value, error) {
 	p := math.Pow10(n.Integer())
 	return AsValue(math.Round(arg.Float()*p) / p), nil
 }
-func defFloor(ctx EvaluatorContext, arg *Value) (*Value, error) {
+func defFloor(ctx *EvaluatorContext, arg *Value) (*Value, error) {
 	if !arg.IsNumber() {
 		return nil, ArgumentNotNumberErr.SetMessagef("floor")
 	}
@@ -194,7 +193,7 @@ func defFloor(ctx EvaluatorContext, arg *Value) (*Value, error) {
 	}
 	return AsValue(math.Floor(arg.Float())), nil
 }
-func defCeil(ctx EvaluatorContext, arg *Value) (*Value, error) {
+func defCeil(ctx *EvaluatorContext, arg *Value) (*Value, error) {
 	if !arg.IsNumber() {
 		return nil, ArgumentNotNumberErr.SetMessagef("ceil")
 	}
@@ -203,7 +202,7 @@ func defCeil(ctx EvaluatorContext, arg *Value) (*Value, error) {
 	}
 	return AsValue(math.Ceil(arg.Float())), nil
 }
-func defAbs(ctx EvaluatorContext, arg *Value) (*Value, error) {
+func defAbs(ctx *EvaluatorContext, arg *Value) (*Value, error) {
 	if !arg.IsNumber() {
 		return nil, ArgumentNotNumberErr.SetMessagef("abs")
 	}
@@ -212,7 +211,7 @@ func defAbs(ctx EvaluatorContext, arg *Value) (*Value, error) {
 	}
 	return AsValue(math.Abs(arg.Float())), nil
 }
-func defSin(ctx EvaluatorContext, arg *Value) (*Value, error) {
+func defSin(ctx *EvaluatorContext, arg *Value) (*Value, error) {
 	if !arg.IsNumber() {
 		return nil, ArgumentNotNumberErr.SetMessagef("sin")
 	}
@@ -221,7 +220,7 @@ func defSin(ctx EvaluatorContext, arg *Value) (*Value, error) {
 	}
 	return AsValue(math.Sin(arg.Float())), nil
 }
-func defCos(ctx EvaluatorContext, arg *Value) (*Value, error) {
+func defCos(ctx *EvaluatorContext, arg *Value) (*Value, error) {
 	if !arg.IsNumber() {
 		return nil, ArgumentNotNumberErr.SetMessagef("cos")
 	}
@@ -230,7 +229,7 @@ func defCos(ctx EvaluatorContext, arg *Value) (*Value, error) {
 	}
 	return AsValue(math.Cos(arg.Float())), nil
 }
-func defTan(ctx EvaluatorContext, arg *Value) (*Value, error) {
+func defTan(ctx *EvaluatorContext, arg *Value) (*Value, error) {
 	if !arg.IsNumber() {
 		return nil, ArgumentNotNumberErr.SetMessagef("tan")
 	}

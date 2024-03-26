@@ -13,6 +13,9 @@ import (
 
 var (
 	TypeOfValuePtr         = reflect.TypeOf(new(Value))
+	TypeOfValMapPtr        = reflect.TypeOf(make(ValMap))
+	TypeOfValElementMapPrt = reflect.TypeOf(new(ValElementMap))
+	TypeOfValElementPrt    = reflect.TypeOf(new(ValElement))
 	TypeOfEvaluatorContext = reflect.TypeOf(new(EvaluatorContext)).Elem()
 	TypeOfDecimalPtr       = reflect.TypeOf(new(decimal.Decimal))
 )
@@ -79,7 +82,6 @@ func (v *Value) Decimal() decimal.Decimal {
 	default:
 		if val.Type() == TypeOfDecimalPtr.Elem() {
 			b, ok := val.Interface().(decimal.Decimal)
-			fmt.Println("---------------Decimal----------------", b)
 			if ok {
 				return b
 			}
