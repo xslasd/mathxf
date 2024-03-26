@@ -16,7 +16,7 @@ var (
 	TypeOfValMapPtr        = reflect.TypeOf(make(ValMap))
 	TypeOfValElementMapPrt = reflect.TypeOf(new(ValElementMap))
 	TypeOfValElementPrt    = reflect.TypeOf(new(ValElement))
-	TypeOfEvaluatorContext = reflect.TypeOf(new(EvaluatorContext)).Elem()
+	TypeOfEvaluatorContext = reflect.TypeOf(new(EvaluatorContext))
 	TypeOfDecimalPtr       = reflect.TypeOf(new(decimal.Decimal))
 )
 

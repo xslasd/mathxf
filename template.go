@@ -66,12 +66,13 @@ func NewTemplate(tpl string) (*template, error) {
 			Context:         context.TODO(),
 			IsHighPrecision: true,
 			ValMap:          DefFunc,
+			ResultMap:       make(map[string]ValMap),
 			defResultKey:    "res",
 			parseErrFn:      ParseErr,
 		},
 	}
 	t.ctx.ValMap["pi"] = NewConstValElement(math.Pi, false)
-	t.ctx.ValMap[t.ctx.defResultKey] = NewResultValElement(make(ValMap))
+	t.ctx.ResultMap[t.ctx.defResultKey] = make(ValMap)
 	return t, nil
 }
 func (t *template) ParseErr() ParseECodeFn {
@@ -99,8 +100,8 @@ func (t *template) PublicValMap() ValElementMap {
 	return t.getValMap(PublicVal)
 }
 
-func (t *template) ResultValMap() ValElementMap {
-	return t.getValMap(ResultVal)
+func (t *template) ResultValMap() map[string]ValMap {
+	return t.ctx.ResultMap
 }
 
 func (t *template) getValMap(valType ValType) ValElementMap {

@@ -127,8 +127,13 @@ func (v variableResolver) SetPartValue(ctx *EvaluatorContext, valueEvaluator IEv
 				varData = reflect.ValueOf(&ctx.ValMap).Elem()
 				varData = varData.MapIndex(reflect.ValueOf(keyName)).Elem()
 			} else {
-				pos := v.locationToken
-				return AssignObjectErr.SetMessagef(keyName).SetPosition(pos.line, pos.col)
+				if val, ok := ctx.ResultMap[keyName]; ok {
+					isResultVal = true
+					varData = reflect.ValueOf(&val).Elem()
+				} else {
+					pos := v.locationToken
+					return AssignObjectErr.SetMessagef(keyName).SetPosition(pos.line, pos.col)
+				}
 			}
 		} else {
 			if varData.IsValid() && varData.Type() == TypeOfValElementPrt.Elem() {
@@ -138,12 +143,9 @@ func (v variableResolver) SetPartValue(ctx *EvaluatorContext, valueEvaluator IEv
 						varData.FieldByName("Val").Set(reflect.ValueOf(make(ValMap)))
 						varData = varData.FieldByName("Val")
 					}
-					fmt.Println(varData, "-------!-isResultVal-------------", part.name)
 				} else {
-					varData = varData.FieldByName("Val")
-					varData = varData.Interface().(reflect.Value)
+					varData = varData.FieldByName("Val").Elem()
 				}
-				fmt.Println(varData.Type(), "--------TypeOfValElementPrt-------------", part.name)
 			}
 			if varData.Kind() == reflect.Ptr {
 				varData = varData.Elem()
@@ -156,21 +158,16 @@ func (v variableResolver) SetPartValue(ctx *EvaluatorContext, valueEvaluator IEv
 			if ok {
 				varData = reflect.ValueOf(valM)
 			}
-			fmt.Println(ok, varData.Kind(), "-----------part.typ-----------", part.name)
 			switch part.typ {
 			case VariablePartTypeIdent:
 				switch varData.Kind() {
 				case reflect.Interface:
 					if index != pLen-1 {
-						fmt.Println("----reflect.Interface", part.name)
 						pos := v.locationToken
 						return VariableNotAccessErr.SetMessagef("reflect.Struct or reflect.Map", varData.Kind().String()).SetPosition(pos.line, pos.col)
 					}
-					fmt.Println("----------------------------")
 				case reflect.Struct:
-					fmt.Println(varData.Interface(), varData.Type(), "--------Struct-------------", part.name)
 					if varData.Type() == TypeOfValElementPrt.Elem() {
-						fmt.Println("------------TypeOfValElementPrt----------------")
 						va := varData.FieldByName("Val")
 						if !va.IsValid() {
 							if isResultVal {
@@ -183,9 +180,7 @@ func (v variableResolver) SetPartValue(ctx *EvaluatorContext, valueEvaluator IEv
 						varData = varData.FieldByName(part.name)
 					}
 				case reflect.Map:
-					fmt.Println(varData, "--------Map-------------", part.name)
 					partVal := varData.MapIndex(reflect.ValueOf(part.name))
-					fmt.Println(partVal, "-------")
 					if !partVal.IsValid() {
 						if !isResultVal {
 							pos := v.locationToken
@@ -202,11 +197,7 @@ func (v variableResolver) SetPartValue(ctx *EvaluatorContext, valueEvaluator IEv
 							varData = partVal.Elem()
 						}
 					}
-					//if index != pLen-1 {
-					//	varData = varData.MapIndex(reflect.ValueOf(part.name))
-					//}
 				default:
-					fmt.Println("---------------VariableNotAccessErr-----------------")
 					pos := v.locationToken
 					return VariableNotAccessErr.SetMessagef("reflect.Struct or reflect.Map", varData.Kind().String()).SetPosition(pos.line, pos.col)
 				}
@@ -282,18 +273,7 @@ func (v variableResolver) SetPartValue(ctx *EvaluatorContext, valueEvaluator IEv
 			varData.FieldByName(keyName).Set(reflect.ValueOf(val.Val))
 		}
 	case reflect.Map:
-		if varData.Type() == TypeOfValElementMapPrt.Elem() {
-			valMap := varData.MapIndex(reflect.ValueOf(keyName))
-			if !valMap.IsValid() {
-				valEle := reflect.ValueOf(NewResultValElement(val))
-				varData.SetMapIndex(reflect.ValueOf(keyName), valEle)
-			} else {
-				valMap.Elem().FieldByName("Val").Set(reflect.ValueOf(val))
-			}
-		} else {
-			fmt.Println(varData, "keyName", keyName, val.Val)
-			varData.SetMapIndex(reflect.ValueOf(keyName), reflect.ValueOf(val.Val))
-		}
+		varData.SetMapIndex(reflect.ValueOf(keyName), reflect.ValueOf(val))
 	case reflect.String:
 		varData.SetString(val.String())
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
@@ -324,6 +304,7 @@ func (v variableResolver) SetPartValue(ctx *EvaluatorContext, valueEvaluator IEv
 func (v variableResolver) Evaluate(ctx *EvaluatorContext) (*Value, error) {
 	var varData reflect.Value
 	var isFunc bool
+	//pLen := len(v.parts)
 	for index, part := range v.parts {
 		isFunc = false
 		if index == 0 {
@@ -332,7 +313,6 @@ func (v variableResolver) Evaluate(ctx *EvaluatorContext) (*Value, error) {
 			valEle, ok := ctx.ValMap[name]
 			if ok {
 				varData = reflect.ValueOf(valEle.Val)
-				varData = varData.Interface().(reflect.Value)
 				isFunc = valEle.IsFunc
 			} else {
 				pos := v.locationToken
@@ -354,7 +334,6 @@ func (v variableResolver) Evaluate(ctx *EvaluatorContext) (*Value, error) {
 			if varData.Kind() == reflect.Interface {
 				varData = reflect.ValueOf(varData.Interface())
 			}
-			fmt.Println("----MapMap-------------", part.name, varData.Type())
 			switch part.typ {
 			case VariablePartTypeIdent:
 				switch varData.Kind() {
@@ -416,7 +395,6 @@ func (v variableResolver) Evaluate(ctx *EvaluatorContext) (*Value, error) {
 			}
 		}
 		if !varData.IsValid() {
-			fmt.Println("-------???-----", varData, part.name)
 			return AsValue(nil), nil
 		}
 		if varData.Type() == TypeOfValuePtr {
@@ -436,6 +414,7 @@ func (v variableResolver) Evaluate(ctx *EvaluatorContext) (*Value, error) {
 			numOut := funcT.NumOut()
 			isVariadic := funcT.IsVariadic()
 			currArgs := part.callingArgs
+
 			currLen := len(currArgs)
 			var args []reflect.Value
 			ind := 0

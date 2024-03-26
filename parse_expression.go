@@ -1,7 +1,6 @@
 package mathxf
 
 import (
-	"fmt"
 	"strconv"
 )
 
@@ -211,12 +210,9 @@ func (p *Parser) parseVariableOrLiteral() (IEvaluator, error) {
 		}
 		return s, nil
 	case TokenCharConstant:
-		_rune, _, tail, err := strconv.UnquoteChar(t.val[1:], t.val[0])
+		_rune, _, _, err := strconv.UnquoteChar(t.val[1:], t.val[0])
 		if err != nil {
 			return nil, err
-		}
-		if tail != "'" {
-			return nil, fmt.Errorf("malformed character constant: %s", t.val)
 		}
 		fr := &numberResolver{
 			locationToken: &t,
@@ -260,7 +256,6 @@ func (p *Parser) parseVariableOrLiteral() (IEvaluator, error) {
 
 func (p *Parser) ParseVariable(t Token) (*variableResolver, error) {
 	if t.typ != TokenIdentifier {
-		fmt.Println("--------------------------", t)
 		return nil, UnexpectedTokenErr.SetMessagef("parse variable", t.val).SetPosition(t.line, t.col)
 	}
 	resolver := &variableResolver{
@@ -316,7 +311,6 @@ func (p *Parser) ParseVariable(t Token) (*variableResolver, error) {
 				if next2.typ != TokenComma {
 					return nil, MissingRightParenErr.SetMessagef(")").SetPosition(next2.line, next2.col)
 				}
-				p.NextToken()
 			}
 		default:
 			p.Backup()

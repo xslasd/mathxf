@@ -15,7 +15,7 @@ func (t tagSetNode) Execute(ctx *EvaluatorContext) error {
 		pos := t.expression.GetPositionToken()
 		return VariableAlreadyExistsErr.SetMessagef(t.name).SetPosition(pos.line, pos.col)
 	}
-	ctx.ValMap[t.name] = NewPrivateValElement(val.Val)
+	ctx.ValMap[t.name] = NewPrivateValElement(val)
 	return nil
 }
 func tagSetParser(parser *Parser) (INode, error) {

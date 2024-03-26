@@ -5,44 +5,37 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"reflect"
 )
 
-type ValMap map[string]reflect.Value
+type ValMap map[string]*Value
 type ValElementMap map[string]*ValElement
 
 type ValElement struct {
 	ValType ValType
 	IsSet   bool
 	IsFunc  bool
-	Val     reflect.Value
+	Val     any
 }
 
 func NewConstValElement(val any, isFunc bool) *ValElement {
 	return &ValElement{
 		ValType: ConstVal,
 		IsFunc:  isFunc,
-		Val:     reflect.ValueOf(val),
+		Val:     val,
 	}
 }
 
 func NewPublicValElement(val any) *ValElement {
 	return &ValElement{
 		ValType: PublicVal,
-		Val:     reflect.ValueOf(val),
+		Val:     val,
 	}
 }
 
 func NewPrivateValElement(val any) *ValElement {
 	return &ValElement{
 		ValType: PrivateVal,
-		Val:     reflect.ValueOf(val),
-	}
-}
-func NewResultValElement(val any) *ValElement {
-	return &ValElement{
-		ValType: ResultVal,
-		Val:     reflect.ValueOf(val),
+		Val:     val,
 	}
 }
 
@@ -61,7 +54,7 @@ type EvaluatorContext struct {
 	context.Context
 	IsHighPrecision bool
 	ValMap          ValElementMap
-	//ResultMap       map[string]ValMap
+	ResultMap       map[string]ValMap
 
 	defResultKey string
 	parseErrFn   ParseECodeFn
@@ -75,9 +68,9 @@ func NewEvaluatorContext(ctx context.Context) *EvaluatorContext {
 		Context:         ctx,
 		IsHighPrecision: true,
 		ValMap:          valMap,
-		//ResultMap:       make(map[string]ValMap),
-		defResultKey: "res",
-		parseErrFn:   ParseErr,
+		ResultMap:       make(map[string]ValMap),
+		defResultKey:    "res",
+		parseErrFn:      ParseErr,
 	}
 	return &res
 }

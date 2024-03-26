@@ -41,7 +41,7 @@ func (n NodeResData) Execute(ctx *EvaluatorContext) error {
 	if err != nil {
 		return err
 	}
-	ctx.ValMap[ctx.defResultKey+"."+n.name] = NewPrivateValElement(val.Val)
+	ctx.ResultMap[ctx.defResultKey][n.name] = val
 	return nil
 }
 
