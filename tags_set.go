@@ -1,7 +1,8 @@
 package mathxf
 
 type tagSetNode struct {
-	SetNodes []*SetNode
+	setNodes []*SetNode
+	isAssign bool
 }
 
 type SetNode struct {
@@ -10,10 +11,14 @@ type SetNode struct {
 }
 
 func (t tagSetNode) Execute(ctx *EvaluatorContext) error {
-	for _, set := range t.SetNodes {
-		val, err := set.expression.Evaluate(ctx)
-		if err != nil {
-			return err
+	var val *Value
+	var err error
+	for index, set := range t.setNodes {
+		if index == 0 || !t.isAssign {
+			val, err = set.expression.Evaluate(ctx)
+			if err != nil {
+				return err
+			}
 		}
 		_, has := ctx.ValMap[set.name]
 		_, isRes := ctx.ResultMap[set.name]
@@ -27,7 +32,7 @@ func (t tagSetNode) Execute(ctx *EvaluatorContext) error {
 }
 func tagSetParser(parser *Parser) (INode, error) {
 	res := tagSetNode{
-		SetNodes: make([]*SetNode, 0),
+		setNodes: make([]*SetNode, 0),
 	}
 	var isAssign bool
 	var isComma bool
@@ -74,11 +79,12 @@ func tagSetParser(parser *Parser) (INode, error) {
 		}
 	}
 	for _, name := range setNameArr {
-		res.SetNodes = append(res.SetNodes, &SetNode{
+		res.setNodes = append(res.setNodes, &SetNode{
 			name:       name,
 			expression: exp,
 		})
 	}
+	res.isAssign = isAssign
 	return res, nil
 }
 
