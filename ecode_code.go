@@ -26,8 +26,9 @@ var (
 	InvalidReplaceStrErr     = New(-521, "invalid replace string. error string: %s")
 	DivideZeroErr            = New(-522, "divide zero")
 	UnknownOperatorErr       = New(-523, "unknown operator %s")
+	VariableIsKeywordErr     = New(-524, "variable '%s' is keyword")
 
-	TagRegisteredErr       = New(-524, "tag '%s' is already registered")
-	ConstRegisteredErr     = New(-525, "const '%s' is already exists")
-	ResultKeyRegisteredErr = New(-526, "result key '%s' is already exists")
+	TagRegisteredErr       = New(-525, "tag '%s' is already registered")
+	ConstRegisteredErr     = New(-526, "const '%s' is already exists")
+	ResultKeyRegisteredErr = New(-527, "result key '%s' is already exists")
 )

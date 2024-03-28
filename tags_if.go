@@ -37,9 +37,9 @@ func tagIfParser(parser *Parser) (INode, error) {
 			return nil, err
 		}
 		ifNode.wrappers = append(ifNode.wrappers, wrapper)
-		if parser.PeekToken().val == "else" {
+		if parser.PeekToken().val == KeywordElse {
 			parser.NextToken()
-			if parser.PeekToken().val == "if" {
+			if parser.PeekToken().val == KeywordIf {
 				parser.NextToken()
 				elseIfCondition, err := parser.ParseExpression()
 				if err != nil {

@@ -70,6 +70,34 @@ const (
 	rightComment = "*/"
 )
 
+const (
+	KeywordIf    = "if"
+	KeywordElse  = "else"
+	KeywordSet   = "val"
+	KeywordTrue  = "true"
+	KeywordFalse = "false"
+	KeywordAnd   = "and"
+	KeywordOr    = "or"
+	KeywordNot   = "not"
+	KeywordIn    = "in"
+	KeywordNil   = "nil"
+)
+
+var (
+	TokenKeywords = map[string]tokenType{
+		KeywordTrue:  TokenBool,
+		KeywordFalse: TokenBool,
+		KeywordNil:   TokenNil,
+		KeywordIn:    TokenIn,
+		KeywordAnd:   TokenAnd,
+		KeywordOr:    TokenOr,
+		KeywordNot:   TokenNot,
+		KeywordIf:    TokenIdentifier,
+		KeywordElse:  TokenIdentifier,
+		KeywordSet:   TokenIdentifier,
+	}
+)
+
 // isSpace reports whether r is a space character.
 func isSpace(r rune) bool {
 	return r == ' ' || r == '\t' || r == '\r' || r == '\n'

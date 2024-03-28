@@ -8,14 +8,6 @@ import (
 // stateFn represents the state of the scanner as a function that returns the NextToken state.
 type stateFn func(l *lexer) stateFn
 
-func textStateFn(l *lexer) stateFn {
-	for l.state = baseStateFn; l.state != nil; {
-		l.state = l.state(l)
-	}
-	l.emit(TokenEOF)
-	return nil
-}
-
 func baseStateFn(l *lexer) stateFn {
 	if strings.HasPrefix(l.input[l.pos:], comment) {
 		return comment1StateFn(l)
@@ -236,26 +228,12 @@ func identifierStateFn(l *lexer) stateFn {
 		default:
 			l.backup()
 			word := l.input[l.start:l.pos]
-			//token, ok := TokenKeywords[word]
-			//if ok {
-			//	l.emit(token)
-			//} else {
-			switch word {
-			case "true", "false":
-				l.emit(TokenBool)
-			case "in":
-				l.emit(TokenIn)
-			case "and":
-				l.emit(TokenAnd)
-			case "or":
-				l.emit(TokenOr)
-			case "nil":
-				l.emit(TokenNil)
-			default:
+			token, ok := TokenKeywords[word]
+			if ok {
+				l.emit(token)
+			} else {
 				l.emit(TokenIdentifier)
 			}
-
-			//}
 			return baseStateFn
 		}
 	}

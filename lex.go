@@ -10,9 +10,8 @@ const eof = -1
 
 // lexer holds the state of the scanner.
 type lexer struct {
-	input string // the string being scanned
-
-	state stateFn // the next lexing function to enter
+	input           string            // the string being scanned
+	replaceKeywords map[string]string // todo replace keywords
 
 	lastTokenType tokenType  // last Token type
 	tokens        chan Token // channel of scanned tokens
@@ -37,7 +36,11 @@ func lex(input string) *lexer {
 // run runs the state machine for the lexer.
 func (l *lexer) run() {
 	go func() {
-		textStateFn(l)
+		state := baseStateFn
+		for state != nil {
+			state = state(l)
+		}
+		l.emit(TokenEOF)
 		close(l.tokens)
 	}()
 }

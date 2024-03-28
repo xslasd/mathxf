@@ -47,18 +47,15 @@ func (t *template) AddFuncOrConst(name string, val any) error {
 	}
 	return nil
 }
-
 func (t *template) SetParseErrFn(fn ParseECodeFn) {
 	t.ctx.parseErrFn = fn
 }
 func (t *template) SetContext(ctx context.Context) {
 	t.ctx.Context = ctx
 }
-
 func (t *template) SetDefResultKey(key string) {
 	t.ctx.defResultKey = key
 }
-
 func (t *template) AddResultKeys(keys ...string) error {
 	for _, key := range keys {
 		_, ok := t.ctx.ResultMap[key]

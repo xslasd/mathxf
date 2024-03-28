@@ -12,11 +12,10 @@ func (t *template) RegisterTag(name string, parserFn TagParser) error {
 	fmt.Printf("registering tag '%s' \n", name)
 	t.tags[name] = parserFn
 	return nil
-
 }
 func defTags() map[string]TagParser {
 	return map[string]TagParser{
-		"if":  tagIfParser,
-		"set": tagSetParser,
+		KeywordIf:  tagIfParser,
+		KeywordSet: tagSetParser,
 	}
 }
