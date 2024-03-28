@@ -11,7 +11,8 @@ func (t tagSetNode) Execute(ctx *EvaluatorContext) error {
 		return err
 	}
 	_, has := ctx.ValMap[t.name]
-	if has {
+	_, isRes := ctx.ResultMap[t.name]
+	if has || isRes {
 		pos := t.expression.GetPositionToken()
 		return VariableAlreadyExistsErr.SetMessagef(t.name).SetPosition(pos.line, pos.col)
 	}

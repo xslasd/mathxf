@@ -12,19 +12,9 @@ type numberResolver struct {
 	val           float64
 }
 
-func (f numberResolver) Execute(ctx *EvaluatorContext) error {
-	val, err := f.Evaluate(ctx)
-	if err != nil {
-		return err
-	}
-	fmt.Println(val)
-	return nil
-}
-
 func (f numberResolver) GetPositionToken() *Token {
 	return f.locationToken
 }
-
 func (f numberResolver) Evaluate(ctx *EvaluatorContext) (*Value, error) {
 	if ctx.IsHighPrecision {
 		return AsValue(decimal.NewFromFloat(f.val)), nil
@@ -37,19 +27,9 @@ type boolResolver struct {
 	val           bool
 }
 
-func (b boolResolver) Execute(ctx *EvaluatorContext) error {
-	val, err := b.Evaluate(ctx)
-	if err != nil {
-		return err
-	}
-	fmt.Println(val)
-	return nil
-}
-
 func (b boolResolver) GetPositionToken() *Token {
 	return b.locationToken
 }
-
 func (b boolResolver) Evaluate(ctx *EvaluatorContext) (*Value, error) {
 	return AsValue(b.val), nil
 }
@@ -59,19 +39,9 @@ type stringResolver struct {
 	val           string
 }
 
-func (s stringResolver) Execute(ctx *EvaluatorContext) error {
-	val, err := s.Evaluate(ctx)
-	if err != nil {
-		return err
-	}
-	fmt.Println(val)
-	return nil
-}
-
 func (s stringResolver) GetPositionToken() *Token {
 	return s.locationToken
 }
-
 func (s stringResolver) Evaluate(ctx *EvaluatorContext) (*Value, error) {
 	return AsValue(s.val), nil
 }
@@ -79,15 +49,6 @@ func (s stringResolver) Evaluate(ctx *EvaluatorContext) (*Value, error) {
 type variableResolver struct {
 	locationToken *Token
 	parts         []*variablePart
-}
-
-func (v variableResolver) Execute(ctx *EvaluatorContext) error {
-	val, err := v.Evaluate(ctx)
-	if err != nil {
-		return err
-	}
-	fmt.Println(val)
-	return nil
 }
 
 func (v variableResolver) GetPositionToken() *Token {
@@ -268,20 +229,24 @@ func (v variableResolver) SetPartValue(ctx *EvaluatorContext, valueEvaluator IEv
 			if isPublicVal {
 				varData.FieldByName("IsSet").Set(reflect.ValueOf(true))
 			}
-			varData.FieldByName("Val").Set(reflect.ValueOf(val.Val))
+			varData.FieldByName("Val").Set(val.Val)
 		} else {
-			varData.FieldByName(keyName).Set(reflect.ValueOf(val.Val))
+			varData.FieldByName(keyName).Set(val.Val)
 		}
 	case reflect.Map:
-		varData.SetMapIndex(reflect.ValueOf(keyName), reflect.ValueOf(val))
+		if varData.Type() == TypeOfValMapPtr {
+			varData.SetMapIndex(reflect.ValueOf(keyName), reflect.ValueOf(val))
+		} else {
+			varData.SetMapIndex(reflect.ValueOf(keyName), val.Val)
+		}
 	case reflect.String:
 		varData.SetString(val.String())
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		varData.SetInt(int64(val.Integer()))
 	case reflect.Array:
-		varData.Index(keyInd).Set(reflect.ValueOf(val.Interface()))
+		varData.Index(keyInd).Set(val.Val)
 	case reflect.Slice:
-		varData.Index(keyInd).Set(reflect.ValueOf(val.Interface()))
+		varData.Index(keyInd).Set(val.Val)
 	case reflect.Float32, reflect.Float64:
 		if !varData.CanSet() {
 			pos := v.locationToken
@@ -300,7 +265,6 @@ func (v variableResolver) SetPartValue(ctx *EvaluatorContext, valueEvaluator IEv
 	}
 	return nil
 }
-
 func (v variableResolver) Evaluate(ctx *EvaluatorContext) (*Value, error) {
 	var varData reflect.Value
 	var isFunc bool
@@ -533,19 +497,9 @@ type arrayResolver struct {
 	parts         []*variablePart
 }
 
-func (a arrayResolver) Execute(ctx *EvaluatorContext) error {
-	val, err := a.Evaluate(ctx)
-	if err != nil {
-		return err
-	}
-	fmt.Println(val)
-	return nil
-}
-
 func (a arrayResolver) GetPositionToken() *Token {
 	return a.locationToken
 }
-
 func (a arrayResolver) Evaluate(ctx *EvaluatorContext) (*Value, error) {
 	if len(a.parts) == 0 {
 		return &Value{}, nil
@@ -562,7 +516,6 @@ func (a arrayResolver) Evaluate(ctx *EvaluatorContext) (*Value, error) {
 		Val: reflect.ValueOf(items),
 	}, nil
 }
-
 func (a arrayResolver) String() string {
 	parts := make([]string, 0, len(a.parts))
 	for _, p := range a.parts {

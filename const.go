@@ -5,7 +5,10 @@ import (
 	"math"
 )
 
-var DefFunc = map[string]*ValElement{
+var DefConst = map[string]*ValElement{
+	"e":  NewConstValElement(decimal.NewFromFloat(math.E), false),
+	"pi": NewConstValElement(decimal.NewFromFloat(math.Pi), false),
+
 	"sum":   NewConstValElement(defSum, true),
 	"avg":   NewConstValElement(defAvg, true),
 	"max":   NewConstValElement(defMax, true),

@@ -1,13 +1,11 @@
 package mathxf
 
 import (
-	"fmt"
 	"github.com/shopspring/decimal"
 	"math"
 )
 
 type IEvaluator interface {
-	INode
 	GetPositionToken() *Token
 	Evaluate(ctx *EvaluatorContext) (*Value, error)
 }
@@ -21,14 +19,6 @@ type Expression struct {
 	expr1   IEvaluator
 	expr2   IEvaluator
 	opToken *Token
-}
-
-func (e Expression) Execute(ctx *EvaluatorContext) error {
-	_, err := e.expr1.Evaluate(ctx)
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func (e Expression) GetPositionToken() *Token {
@@ -78,14 +68,14 @@ type relationalExpression struct {
 	opToken *Token
 }
 
-func (r relationalExpression) Execute(ctx *EvaluatorContext) error {
-	v, err := r.Evaluate(ctx)
-	if err != nil {
-		return err
-	}
-	fmt.Println(v, "------relationalExpression---------", r.opToken.val)
-	return nil
-}
+//func (r relationalExpression) Execute(ctx *EvaluatorContext) error {
+//	v, err := r.Evaluate(ctx)
+//	if err != nil {
+//		return err
+//	}
+//	fmt.Println(v, "------relationalExpression---------", r.opToken.val)
+//	return nil
+//}
 
 func (r relationalExpression) GetPositionToken() *Token {
 	return r.expr1.GetPositionToken()
@@ -175,15 +165,6 @@ type simpleExpression struct {
 	opToken *Token
 }
 
-func (s simpleExpression) Execute(ctx *EvaluatorContext) error {
-	v, err := s.Evaluate(ctx)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("simpleExpression---------------------------:%.16f\n", v.Float())
-	return nil
-}
-
 func (s simpleExpression) GetPositionToken() *Token {
 	return s.term1.GetPositionToken()
 }
@@ -232,15 +213,6 @@ type termExpression struct {
 	factor1 IEvaluator
 	factor2 IEvaluator
 	opToken *Token
-}
-
-func (t termExpression) Execute(ctx *EvaluatorContext) error {
-	v, err := t.Evaluate(ctx)
-	if err != nil {
-		return err
-	}
-	fmt.Println("termExpression---------", v)
-	return nil
 }
 
 func (t termExpression) GetPositionToken() *Token {
@@ -319,15 +291,6 @@ func (t termExpression) Evaluate(ctx *EvaluatorContext) (*Value, error) {
 type powerExpression struct {
 	power1 IEvaluator
 	power2 IEvaluator
-}
-
-func (p powerExpression) Execute(ctx *EvaluatorContext) error {
-	v, err := p.Evaluate(ctx)
-	if err != nil {
-		return err
-	}
-	fmt.Println("powerExpression--------", v)
-	return nil
 }
 
 func (p powerExpression) GetPositionToken() *Token {

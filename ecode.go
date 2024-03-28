@@ -102,7 +102,6 @@ func Cause(e error) ECodes {
 		return nil
 	}
 	ec, ok := errors.Cause(e).(ECodes)
-	fmt.Println("---------Cause---------", ec, ok)
 	if ok {
 		return ec
 	}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 )
 
 type ValMap map[string]*Value
@@ -61,13 +60,10 @@ type EvaluatorContext struct {
 }
 
 func NewEvaluatorContext(ctx context.Context) *EvaluatorContext {
-	valMap := DefFunc
-	valMap["pi"] = NewConstValElement(math.Pi, false)
-	fmt.Printf("registering const '%s' \n", "pi")
 	res := EvaluatorContext{
 		Context:         ctx,
 		IsHighPrecision: true,
-		ValMap:          valMap,
+		ValMap:          DefConst,
 		ResultMap:       make(map[string]ValMap),
 		defResultKey:    "res",
 		parseErrFn:      ParseErr,

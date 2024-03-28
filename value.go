@@ -61,6 +61,9 @@ func (v *Value) IsFloat() bool {
 }
 func (v *Value) IsDecimal() bool {
 	val := v.getResolvedValue()
+	if !val.IsValid() {
+		return false
+	}
 	return val.Type() == TypeOfDecimalPtr.Elem() || v.IsNumber()
 }
 func (v *Value) Decimal() decimal.Decimal {
@@ -80,13 +83,13 @@ func (v *Value) Decimal() decimal.Decimal {
 		}
 		return decimal.NewFromFloat(f)
 	default:
-		if val.Type() == TypeOfDecimalPtr.Elem() {
+		if val.IsValid() && val.Type() == TypeOfDecimalPtr.Elem() {
 			b, ok := val.Interface().(decimal.Decimal)
 			if ok {
 				return b
 			}
 		}
-		//logf("Value.Float() not available for type: %name\n", v.getResolvedValue().Kind().String())
+		logf("Value.Float() not available for type: %s\n", v.getResolvedValue().Kind().String())
 		return decimal.Decimal{}
 	}
 }
@@ -163,7 +166,7 @@ func (v *Value) String() string {
 		return "False"
 	}
 
-	//logf("Value.String() not implemented for type: %name\n", v.getResolvedValue().Kind().String())
+	logf("Value.String() not implemented for type: %s\n", v.getResolvedValue().Kind().String())
 	return v.getResolvedValue().String()
 }
 
@@ -195,7 +198,7 @@ func (v *Value) Integer() int {
 			}
 			return 0
 		}
-		//logf("Value.Integer() not available for type: %name\n", v.getResolvedValue().Kind().String())
+		logf("Value.Integer() not available for type: %s\n", v.getResolvedValue().Kind().String())
 		return 0
 	}
 }
@@ -220,7 +223,6 @@ func (v *Value) Float() float64 {
 		}
 		return f
 	default:
-		fmt.Println("0--------------", val.Type(), val.Type() == TypeOfDecimalPtr.Elem())
 		if val.Type() == TypeOfDecimalPtr.Elem() {
 			b, ok := val.Interface().(decimal.Decimal)
 			if ok {
@@ -229,7 +231,7 @@ func (v *Value) Float() float64 {
 			}
 			return 0
 		}
-		//logf("Value.Float() not available for type: %name\n", v.getResolvedValue().Kind().String())
+		logf("Value.Float() not available for type: %s\n", v.getResolvedValue().Kind().String())
 		return 0.0
 	}
 }
@@ -242,7 +244,7 @@ func (v *Value) Bool() bool {
 	case reflect.Bool:
 		return v.getResolvedValue().Bool()
 	default:
-		//logf("Value.Bool() not available for type: %name\n", v.getResolvedValue().Kind().String())
+		logf("Value.Bool() not available for type: %s\n", v.getResolvedValue().Kind().String())
 		return false
 	}
 }
@@ -292,7 +294,7 @@ func (v *Value) IsTrue() bool {
 			}
 			return false
 		}
-		//logf("Value.IsTrue() not available for type: %name\n", v.getResolvedValue().Kind().String())
+		logf("Value.IsTrue() not available for type: %s\n", v.getResolvedValue().Kind().String())
 		return false
 	}
 }
@@ -307,7 +309,7 @@ func (v *Value) Len() int {
 		runes := []rune(v.getResolvedValue().String())
 		return len(runes)
 	default:
-		//logf("Value.Len() not available for type: %name\n", v.getResolvedValue().Kind().String())
+		logf("Value.Len() not available for type: %s\n", v.getResolvedValue().Kind().String())
 		return 0
 	}
 }
@@ -322,7 +324,7 @@ func (v *Value) Slice(i, j int) *Value {
 		runes := []rune(v.getResolvedValue().String())
 		return AsValue(string(runes[i:j]))
 	default:
-		//logf("Value.Slice() not available for type: %name\n", v.getResolvedValue().Kind().String())
+		logf("Value.Slice() not available for type: %s\n", v.getResolvedValue().Kind().String())
 		return AsValue([]int{})
 	}
 }
@@ -344,7 +346,7 @@ func (v *Value) Index(i int) *Value {
 		}
 		return AsValue("")
 	default:
-		//logf("Value.Slice() not available for type: %name\n", v.getResolvedValue().Kind().String())
+		logf("Value.Slice() not available for type: %s\n", v.getResolvedValue().Kind().String())
 		return AsValue([]int{})
 	}
 }
@@ -379,7 +381,7 @@ func (v *Value) Contains(other *Value) bool {
 		case string:
 			mapValue = baseValue.MapIndex(other.getResolvedValue())
 		default:
-			fmt.Printf("Value.Contains() does not support lookup type '%name'\n", other.getResolvedValue().Kind().String())
+			logf("Value.Contains() does not support lookup type '%s'\n", other.getResolvedValue().Kind().String())
 			return false
 		}
 		return mapValue.IsValid()
@@ -399,7 +401,7 @@ func (v *Value) Contains(other *Value) bool {
 		}
 		return false
 	default:
-		fmt.Printf("Value.Contains() not available for type: %v\n", baseValue.Kind().String())
+		logf("Value.Contains() not available for type: %s\n", baseValue.Kind().String())
 		return false
 	}
 }
@@ -513,7 +515,7 @@ func (v *Value) IterateOrder(fn func(idx, count int, key, value *Value) bool, em
 		}
 		return // done
 	default:
-		//logf("Value.Iterate() not available for type: %name\n", v.getResolvedValue().Kind().String())
+		logf("Value.Iterate() not available for type: %s\n", v.getResolvedValue().Kind().String())
 	}
 	empty()
 }

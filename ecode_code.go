@@ -23,9 +23,9 @@ var (
 
 	AssignObjectErr          = New(-519, "assign object error,Can only be 'Public'、'ResultMap'、Private objects;unexpected token %v")
 	VariableAlreadyExistsErr = New(-520, "variable '%s' already exists,Cannot perform set operation")
-
-	DivideZeroErr      = New(-522, "divide zero")
-	UnknownOperatorErr = New(-523, "unknown operator %s")
+	InvalidReplaceStrErr     = New(-521, "invalid replace string. error string: %s")
+	DivideZeroErr            = New(-522, "divide zero")
+	UnknownOperatorErr       = New(-523, "unknown operator %s")
 
 	TagRegisteredErr       = New(-524, "tag '%s' is already registered")
 	ConstRegisteredErr     = New(-525, "const '%s' is already exists")
