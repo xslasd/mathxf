@@ -58,6 +58,9 @@ func (t *template) SetDefResultKey(key string) {
 }
 func (t *template) AddResultKeys(keys ...string) error {
 	for _, key := range keys {
+		if key == DefResultEnvKey {
+			return t.ParseErr()(ResultKeyRegisteredErr.SetMessagef(key))
+		}
 		_, ok := t.ctx.ResultMap[key]
 		if ok {
 			return t.ParseErr()(ResultKeyRegisteredErr.SetMessagef(key))
