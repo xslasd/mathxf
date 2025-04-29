@@ -1,8 +1,9 @@
 package mathxf
 
 import (
-	"github.com/shopspring/decimal"
 	"math"
+
+	"github.com/shopspring/decimal"
 )
 
 var DefConst = map[string]*ValElement{
@@ -68,7 +69,7 @@ func defAvg(ctx *EvaluatorContext, args ...*Value) (*Value, error) {
 	if ctx.IsHighPrecision {
 		var rest []decimal.Decimal
 		for ind, item := range args {
-			if item.IsNumber() {
+			if !item.IsNumber() {
 				return nil, ArgumentNotNumberErr.SetMessagef("avg")
 			}
 			if ind == 0 {
